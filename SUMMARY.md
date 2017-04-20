@@ -1,6 +1,7 @@
 # Summary
 
 * [Introduction](README.md)
+<<<<<<< e000925e79cb2c668592b4a4cbde07a0ace35583
 * [7. 内核中的同步](Ch7/introduction.md)
     * [7.1. 临界区和竞争状态](Ch7/section7_1.md)
     * [7.2. 内核同步措施](Ch7/section7_2.md)
@@ -24,4 +25,35 @@
     * [9.5 块驱动程序](Ch9/section9_5.md)
     * [9.6 小结](Ch9/section9_6.md)
     * [习题](Ch9/exercise9.md)
+=======
+* [第一章 概述](chapter1.md)
+  * [1.1认识操作系统](chapter1/11ren-shi-cao-zuo-xi-tong.md)
+  * [1.2 开放源代码的Unix/Linux操作系统](chapter1/12.md)
+  * [1.3Linux内核](chapter1/13linuxnei-he.md)
+  * [1.4Linux内核源代码](chapter1/14linuxnei-he-yuan-dai-ma.md)
+  * [1.5 Linux内核模块编程入门](chapter1/15-linuxnei-he-mo-kuai-bian-cheng-ru-men.md)
+  * [1.6 应用程序与内核模块的比较](chapter1/16-ying-yong-cheng-xu-yu-nei-he-mo-kuai-de-bi-jiao.md)
+  * [1.7 Linux内核中链表的实现及应用](chapter1/17-linuxnei-he-zhong-lian-biao-de-shi-xian-ji-ying-yong.md)
+  * [1.8 小结](chapter1/18-xiao-jie.md)
+  * [习题](chapter1/xi-ti.md)
+* [第二章 内存寻址](di-er-zhang-nei-cun-xun-zhi.md)
+  * [2.1 内存寻址](chapter2/21-nei-cun-xun-zhi.md)
+  * [2.2 段机制](chapter2/22-duan-ji-zhi.md)
+  * [2.3 分页机制](chapter2/23-fen-ye-ji-zhi.md)
+  * [2.4 Linux中的分页机制](chapter2/24-linuxzhong-de-fen-ye-ji-zhi.md)
+  * [2.5 Linux中的汇编语言](chapter2/25-linuxzhong-de-hui-bian-yu-yan.md)
+  * [2.6 Linux系统地址映射举例](chapter2/26-linuxxi-tong-di-zhi-ying-she-ju-li.md)
+  * [2.7 小结](chapter2/27-xiao-jie.md)
+  * [习题](chapter2/xi-ti.md)
+* [第三章 进程](di-san-zhang.md)
+  * [3.1 进程介绍](chapter3/31-jin-cheng-jie-shao.md)
+  * [3.2 Linux系统中的进程控制块](chapter3/32-linuxxi-tong-zhong-de-jin-cheng-kong-zhi-kuai.md)
+  * [3.3 Linux系统中进程的组织方式](chapter3/33-linuxxi-tong-zhong-jin-cheng-de-zu-zhi-fang-shi.md)
+  * [3.4 进程调度](chapter3/34-jin-cheng-diao-du.md)
+  * [3.5 进程的创建](chapter3/35-jin-cheng-de-chuang-jian.md)
+  * [3.6 与进程相关的系统调用及其应用](chapter3/36-yu-jin-cheng-xiang-guan-de-xi-tong-diao-yong-ji-qi-ying-yong.md)
+  * [3.7 系统调用及应用](chapter3/37-xi-tong-diao-yong-ji-ying-yong.md)
+  * [3.8 小结](chapter3/38-xiao-jie.md)
+  * [习题](chapter3/xi-ti.md)
+>>>>>>> Linux
 
