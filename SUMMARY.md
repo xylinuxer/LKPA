@@ -2,7 +2,6 @@
 Summary
 
 * [Introduction](README.md)
-<<<<<<< e000925e79cb2c668592b4a4cbde07a0ace35583
 * [1 概述](第一章.md)
 * [1.1认识操作系统](第一章/section1_1.md)
 * [1.2 开放源代码的Unix/Linux操作系统](第一章/section1_2.md)
@@ -85,6 +84,3 @@ Summary
 * [9.5 块驱动程序](第九章/section9_5.md)
 * [9.6 小结](第九章/section9_6.md)
 * [习题](第九章/exercise9.md)
-
-
->>>>>>> Linux
