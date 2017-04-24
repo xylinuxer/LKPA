@@ -96,13 +96,16 @@ Linux内核也提供了位原子操作，相应的操作函数有set_bit(nr,addr
 自旋锁的定义如下：
 ```c
 typedef struct raw_spinlock {
-        unsigned int slock;
+	arch_spinlock_t raw_lock;
+	...
 } raw_spinlock_t;
 
-typedef struct {  
-        raw_spinlock_t raw_lock;
-        ... 
-} spinlock_t;
+typedef struct spinlock {
+	union {
+		struct raw_spinlock rlock;
+		...
+	};
+} spinlock_t;
 ```
 
 于是，使用自旋锁的基本形式如下：
@@ -195,29 +198,31 @@ void down(struct semaphore *sem)
 像down\_interrputible()等其他一些获取信号量的函数与down()类似，在此不一一解释。从上面的分析也可以看出，如果无信号量可用，则当前进程进入睡眠状态。其中的\_down()函数调用\_down\_common()，这是各种down操作的统一函数：
 
 ```c
-static inline int __sched__down_common(struct semaphore *sem, long state,long timeout)
+static inline int __sched __down_common(struct semaphore *sem, long state,long timeout)
 {
         struct task_struct *task = current;
         struct semaphore_waiter waiter;
+        
         list_add_tail(&waiter.list, &sem->wait_list); /*将当前进程添加到信号量sem的等待队列的队尾*/
         waiter.task = task;
-        waiter.up = 0;
+        waiter.up = false;
+        
         for (;;) {
                 if (signal_pending_state(state, task)) /*如果当前进程被信号唤醒，则返回*/
         	       goto interrupted;
-                if (timeout <= 0) /*如果等待超时，则返回*/
+                if (unlikely(timeout <= 0)) /*如果等待超时，则返回*/
         	       goto timed_out;
                 __set_task_state(task, state); /* 设置进程状态*/
-                spin_unlock_irq(&sem->lock); /* 释放自选锁 */
+                raw_spin_unlock_irq(&sem->lock); /* 释放自选锁 */
                 timeout = schedule_timeout(timeout); /*执行进程切换*/
-                spin_lock_irq(&sem->lock); /*当进程被唤醒时，如果再次进入获取信号量操作，则对其进行加锁*/
+                raw_spin_lock_irq(&sem->lock); /*当进程被唤醒时，如果再次进入获取信号量操作，则对其进行加锁*/
                 if (waiter.up) /*如果进程是被信号量等待队列的其他进程唤醒，则返回*/
                 return 0;
         }
-        timed_out: /* 进程获取信号量等待超时，返回 */
+timed_out: /* 进程获取信号量等待超时，返回 */
         list_del(&waiter.list);
         return -ETIME;
-        interrupted: /*进程等待获取信号量时被信号中断，返回*/
+interrupted: /*进程等待获取信号量时被信号中断，返回*/
         list_del(&waiter.list);
         return -EINTR;
 }
@@ -228,8 +233,8 @@ static inline int __sched__down_common(struct semaphore *sem, long state,long ti
 ```c
 struct semaphore_waiter {
        struct list_head list;
-       struct task_struct* task;
-       int up;
+       struct task_struct *task;
+       bool up;
 };
 ```
 
@@ -251,12 +256,13 @@ _down_common(sem, TASK_INTERRUPTIBLE, MAX_SCHEDULE_TIMEOUT);
 void up(struct semaphore *sem)
 {
         unsigned long flags;
-        spin_lock_irqsave(&sem->lock, flags); /* 对信号操作进行加锁 */
-        if list_empty(&sem->wait_list) /*如果该信号量的等待队列为空，则释放信号量 */
+        
+        raw_spin_lock_irqsave(&sem->lock, flags); /* 对信号操作进行加锁 */
+        if (likely(list_empty(&sem->wait_list))) /*如果该信号量的等待队列为空，则释放信号量 */
                 sem->count++;
         else /* 否则唤醒该信号量的等待队列队头的进程 */
                 __up(sem);
-        spin_unlock_irqrestore(&sem->lock, flags); /*对信号量操作进行解锁 */
+        raw_spin_unlock_irqrestore(&sem->lock, flags); /*对信号量操作进行解锁 */
 }
 ```
 
@@ -268,15 +274,13 @@ void up(struct semaphore *sem)
 
 内核提供了多种方法来创建信号量。如果要定义一个互斥信号量，则可以使用：
 
-DECLARE\_MUTEX(name);
+DEFINE\_SEMAPHORE(name);
 
 参数name为要定义的信号量的名字。如果信号量已经被定义，只需将其进行初始化，则可以使用以下函数：
 
 ```c
 sema_init(struct semaphore *sem, int val); /*
   初始化信号量sem的使用者数量为val */
-init_MUTEX(sem); /*初始化信号量sem为未锁定的互斥信号量 */
-init_MUTEX_LOCKED(sem); /* 初始化信号量sem为锁定的互斥信号量 */
 ```
 
 (2).信号量的使用
@@ -284,7 +288,7 @@ init_MUTEX_LOCKED(sem); /* 初始化信号量sem为锁定的互斥信号量 */
  信号量的一般使用形式为：
 
 ```c
-static DECLARE_MUTEX(mr_sem);/*声明并初始化互斥信号量*/
+static DEFINE_SEMAPHORE(mr_sem);/*声明并初始化互斥信号量*/
 if(down_interruptible(&mr_sem))
 /*信号被接收 , 信号量还未获取*/
 /*临界区…*/
@@ -292,8 +296,7 @@ if(down_interruptible(&mr_sem))
 ```
 
 
-函数down\_interruptible()试图获取指定的信号量，如果获取失败，它将以TASK\_INTERRUPTIBLE状态睡眠。回忆第三章的内容，这种进程状态意味着任务可以被信号唤醒，一般来说这是件好事。如果进程在等待获取信号量的时候接收到了信号，那么该进程就会被唤醒，而函数down\_interruptible()会返回–EINTR，说明这次任务没有获得所需资源。另一方面，如果down\_interruptible(
-)正常结束并得到了需要的资源，就返回0。
+函数down\_interruptible()试图获取指定的信号量，如果获取失败，它将以TASK\_INTERRUPTIBLE状态睡眠。回忆第三章的内容，这种进程状态意味着任务可以被信号唤醒，一般来说这是件好事。如果进程在等待获取信号量的时候接收到了信号，那么该进程就会被唤醒，而函数down\_interruptible()会返回–EINTR，说明这次任务没有获得所需资源。另一方面，如果down\_interruptible()正常结束并得到了需要的资源，就返回0。
 
 同自旋锁一样，信号量在内核中也有许多变种，比如读者－写者信号量等，这里不做一一介绍。下表是信号量的操作函数列表：
 
