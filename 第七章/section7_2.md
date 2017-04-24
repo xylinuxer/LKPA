@@ -59,7 +59,7 @@ atomic\_sub\_return(i, v)    |  从\*v中减去i,并返回相减之后的值
 
 下面举例说明这些函数的用法：
 
-定义一个atomic\_c类型的数据很简单，还可以定义时给它设定初值：
+定义一个atomic\_t类型的数据很简单，还可以定义时给它设定初值：
 ```c
 atomic_t u; /*定义 u*/
 
@@ -152,7 +152,7 @@ Linux中的信号量是一种睡眠锁。如果有一个任务试图获得一个
 内核中对信号量的定义如下：
 ```c
 struct semaphore {
-        spinlock_t lock;
+        raw_spinlock_t lock;
         unsigned int count;
         struct list_head wait_list;  
 }
@@ -183,12 +183,12 @@ int类型的一个值。如果该值大于0，那么资源就是空闲的，也�
 void down(struct semaphore *sem)
 {
         unsigned long flags;
-        spin_lock_irqsave(&sem->lock, flags);/*加锁，使信号量的操作在关闭中断的状态下进行，防止多处理器并发操作造成错误*/
-        if (sem->count > 0)) /*如果信号量可用，则将引用计数减1 */
+        raw_spin_lock_irqsave(&sem->lock, flags);/*加锁，使信号量的操作在关闭中断的状态下进行，防止多处理器并发操作造成错误*/
+        if (likely(sem->count > 0)) /*如果信号量可用，则将引用计数减1 */
         	sem->count--;
         else /*如果无信号量可用，则调用_down()函数进入睡眠等待状态 */
-        __down(sem);
-        spin_unlock_irqrestore(&sem->lock, flags); /*对信号量的操作解锁*/
+               __down(sem);
+        raw_spin_unlock_irqrestore(&sem->lock, flags); /*对信号量的操作解锁*/
 }
 ```
 
