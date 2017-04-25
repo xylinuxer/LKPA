@@ -4,6 +4,9 @@ Linux操作系统原理与应用第二版改编
 
 ## 目录结构
 
+## Gitbook预览
+[Linux操作系统原理与应用(第二版)](https://xylinuxer.gitbooks.io/lkpa/content/)
+
 ## 约定
 * 全文使用Markdown编写
 * 文中所有代码都是基于Centos7.3.1611，内核版本3.10.0-514.2.1.el7
@@ -13,7 +16,7 @@ Linux操作系统原理与应用第二版改编
 * 全书所有的代码复合C99标准，使用[Linux kernel coding style](LinuxKernelCodingStyle.md)
 * 首行缩进使用`&emsp;`
 
-=======
+---
 
 **内容简介**
 
