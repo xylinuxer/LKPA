@@ -319,13 +319,15 @@ long sys_mysyscall /*333号*/
 ####3. 修改系统调用入口
 
 在arch/x86/kernel/entry_32.S中含有系统调用入口system_call，因此在该文件中添加如下代码：
-
+```c
 syscall_call:
 
 call *sys_call_table(,%eax,4)
 
 movl %eax,PT_EAX(%esp) # store the return value
+```
 
+```c
 #以下代码为新添加代码
 
 cmpl $2, 0x28(%esp) # this is fork()
@@ -353,6 +355,7 @@ cmpl $120, 0x28(%esp) # this is clone()
 je myauditsys
 
 #添加代码段结束
+```
 
 以上代码保证在每次系统调用后都执行比较，如果系统调用号与我们要收集的系统调用号系统，则将调用myauditsys代码段，如下代码：
 ```c
@@ -360,6 +363,8 @@ syscall_exit:
 
 ……
 ```
+
+```c
 #以下为新添加代码段
 
 jmp restore_all #new add
@@ -383,11 +388,13 @@ popl %eax # remove eax from stack
 jmp syscall_exit
 
 #新添加代码段结束
+```
 
+```c
 restore_all:
 
 movl PT_EFLAGS(%esp), %eax # mix EFLAGS, SS and CS
-
+```
 其中调用了我们编写的日志记录例程syscall_audit()。
 
 ####4. 添加自己的文件
