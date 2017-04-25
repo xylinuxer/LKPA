@@ -115,6 +115,7 @@ IRQLIST_16(0xc), IRQLIST_16(0xd), IRQLIST_16(0xe), IRQLIST_16(0xf)
 
 这里定义的数组interrupt[]，从IRQLIST_16(0x2)到IRQLIST_16(0xf)一共有14个数组元素，其中IRQLIST_16()宏的定义如下：
 
+```c
   #define IRQLIST_16(x) 
 
   IRQ(x,0), IRQ(x,1), IRQ(x,2), IRQ(x,3), 
@@ -124,30 +125,37 @@ IRQLIST_16(0xc), IRQLIST_16(0xd), IRQLIST_16(0xe), IRQLIST_16(0xf)
   IRQ(x,8), IRQ(x,9), IRQ(x,a), IRQ(x,b), 
 
   IRQ(x,c), IRQ(x,d), IRQ(x,e), IRQ(x,f)
+```
 
 该宏中定义了16个IRQ(x,y)，这样就有224（14*16）个函数指针。不妨再接着展开IRQ(x,y)宏：
 
+```c
 #define IRQ(x,y) 
 
 IRQ##x##y##_interrupt
 
 ## 表示将字符串连接起来，比如IRQ(0x2,0)就是IRQ0x20_interrupt。
+```
 
 综上可知，以这样的方式就定义出224个函数，从
 IRQ0x20_interrupt一直到IRQ0xff_interupt。那么这些函数名又是如何形成的？我们看如下宏定义：
 
+```c
 #define IRQ_NAME2(nr) nr##_interrupt(void)
 
 #define IRQ_NAME(nr) IRQ_NAME2(IRQ##nr)
+```
 
 从这两个宏的定义可以推知，IRQ_NAME(n)就是IRQn_interrupt(void)函数形式，其中随n具体数字不同，则形成不同的IRQn_interrupt()函数名。接下来，又如何以统一的方式让这些函数拥有内容，也就是说，这些函数的代码是如何形成的？内核定义了BUILD_IRQ宏。
 
 BUILD_IRQ宏是一段嵌入式汇编代码，为了有助于理解，我们把它展开成下面的汇编语言片段：
 
+```c
 IRQn_interrupt:
 
             pushl $n-256
 
 jmp common_interrupt
+```
 
 把中断号减256的结果保存在栈中，这是进入中断处理程序后第一个压入堆栈的值，是一个负数，正数留给系统调用使用。对于每个中断处理程序，唯一不同的就是压入栈中的这个数。然后，所有的中断处理程序都跳到一段相同的代码common_interrupt。关于这段代码，请参看5.3.3一节中断处理程序IRQn_interrupt。
