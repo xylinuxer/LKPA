@@ -79,7 +79,7 @@ unsigned long later = jiffies+5*HZ; /*从现在开始5秒*/
 
 注意jiffies类型为无符号长整型（unsigned long），用其他任何类型存放它都不正确。
 
-#### 2.实际时间xtime
+#### 2. 实际时间xtime
 
 所谓实际时间就是实际生活中以秒为单位的时间。当系统启动时，内核通过读取RTC来初始化实际时间，该时间存放在内核的**xtim**e变量中。
 
