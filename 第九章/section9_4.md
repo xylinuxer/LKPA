@@ -24,7 +24,7 @@ crw--w----. 1 root tty       4,  12 Sep 26 18:05 tty12
 ### 9.4.1.字符设备的数据结构
 
 Linux内核中使用struct
-cdev来表示一个字符设备，该结构位于linux/include/linux/cdev.h：
+cdev来表示一个字符设备，该结构位于include/linux/cdev.h：
 ```c
 struct cdev {
         struct kobject kobj;
@@ -61,7 +61,7 @@ struct globalmem_dev
 
 ### 9.4.2 分配和释放设备号
 
-对于每一个设备，必须有一个惟一的设备号与之相对应。通常会有多个设备共用一个主设备号，而每个设备都唯一拥有一个次设备号。对于设备号有以下几个常用的宏（定义于linux/include/linux/kdev\_t.h中）：
+对于每一个设备，必须有一个惟一的设备号与之相对应。通常会有多个设备共用一个主设备号，而每个设备都唯一拥有一个次设备号。对于设备号有以下几个常用的宏（定义于include/linux/kdev\_t.h中）：
 
 ```c
 #define MINORBITS     20 //次设备号的位数
@@ -73,7 +73,7 @@ struct globalmem_dev
 ```
 在设备驱动程序中，首先向系统申请设备号。申请的设备号一般都是一段连续的号，这些号有共同的主设备号。申请的方法有两种：若提前设定主设备号，则再接着申请若干个连续的次设备；若未指定主设备号，则直接向系统动态申请未被占用的设备号。由此可以看出，如果使用第一种方法，则可能会出现设备号已被系统中的其他设备占用的情况。
 
-上出两种申请设备号的方法分别对应以下两个申请函数：
+上出两种申请设备号的方法分别对应以下两个申请函数(定义于fs/Char_dev.c)：
 ```c
 int register_chrdev_region(dev_t from, unsigned count, const char *name)
 int alloc_chrdev_region(dev_t *dev, unsigned baseminor, unsigned count,
