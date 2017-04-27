@@ -13,21 +13,21 @@ mechanism)**，也就是说应用程序与块设备传递数据时不同于操�
 
 字符驱动程序的接口相对清晰而且易于使用，但是块驱动程序的接口要稍微复杂一些。出现这种情况的原因有两个：一是因为其历史—块驱动程序接口从Linux第一个版本开始就一直存在于每个版本中，并且已经证明很难修改或改进；其二是因为性能，一个慢的字符设备驱动程序虽然不受欢迎，但仍可以接受，但一个慢的块驱动程序将影响整个系统的性能。因此，块驱动程序的接口设计经常受到速度要求的影响。
 
-本节利用一个示例驱动程序讲述块驱动程序的创建。这个驱动程序称为 Mysdd（My Simple
-Block Driver）， Mysdd实现了一个使用系统内存的块设备，从本质上讲，属于一种 RAM
-磁盘驱动程序, 因为块驱动程序的复杂性, Mysdd只给出实现块驱动程序的框架。
+本节利用一个示例驱动程序讲述块驱动程序的创建。这个驱动程序称为 Mysbd（My Simple
+Block Driver）， Mysbd实现了一个使用系统内存的块设备，从本质上讲，属于一种 RAM
+磁盘驱动程序, 因为块驱动程序的复杂性, Mysbd只给出实现块驱动程序的框架。
 
-Mysdd作为一个内存块设备，对其设备结构的定义如下：
+Mysbd作为一个内存块设备，对其设备结构的定义如下：
 
 ```c
-struct Mysdd_dev {
+struct Mysbd_dev {
         void **data; /*存放数据的内存地址*/
         unsigned long size; /*块大小*/
         unsigned int lock; /*用于加锁*/
         unsigned int new_msg; /*标志*/
-        struct Mysdd_dev * next; /*链表中下一个元素*/
+        struct Mysbd_dev * next; /*链表中下一个元素*/
 };
-extern struct Mysdd_dev *Mysdd; /*设备信息*/
+extern struct Mysbd_dev *Mysbd; /*设备信息*/
 ```
 
 
@@ -42,15 +42,15 @@ int register_blkdev(unsigned int major, const char *name,
 struct block_device_operations *bdops);
 int unregister_blkdev(unsigned int major, const char *name);
 ```
-上述函数中的参数意义和字符设备几乎相同，而且可以通过一样的方式动态赋予主设备号。因此，注册Mysdd的具体程序片段如下：
+上述函数中的参数意义和字符设备几乎相同，而且可以通过一样的方式动态赋予主设备号。因此，注册Mysbd的具体程序片段如下：
 
 ```c
-result = register_blkdev(Mysdd_major, "Mysdd", &Mysdd_bdops);
+result = register_blkdev(Mysbd_major, "Mysbd", &Mysbd_bdops);
 if (result < 0) {
-        printk(KERN_WARNING "Mysdd: can't get major %d\n",Mysdd_major);
+        printk(KERN_WARNING "Mysbd: can't get major %d\n",Mysbd_major);
         return result;
 }
-if (Mysdd_major == 0) Mysdd_major = result; /* 动态分配主设备号 */
+if (Mysbd_major == 0) Mysbd_major = result; /* 动态分配主设备号 */
 ```
 
 然而，类似之处到此为止。我们已经看到了一个明显的不同：register\_chrdev()
@@ -67,14 +67,14 @@ int (*check_media_change) (kdev_t); /*检查介质是否已经变化（如软盘
 ```
 这里列出的 open、release 和 ioctl
 方法和字符设备的对应方法相同。其它两个方法是块设备所特有的。  
-Mysdd 使用的 bdops 接口定义如下：
+Mysbd 使用的 bdops 接口定义如下：
 ```c
-struct block_device_operations Mysdd_bdops = {
-        open: Mysdd_open,
-        release: Mysdd_release,
-        ioctl: Mysdd_ioctl,
-        check_media_change: Mysdd_check_change,
-        revalidate: Mysdd_revalidate,
+struct block_device_operations Mysbd_bdops = {
+        open: Mysbd_open,
+        release: Mysbd_release,
+        ioctl: Mysbd_ioctl,
+        check_media_change: Mysbd_check_change,
+        revalidate: Mysbd_revalidate,
 };
 ```
 
@@ -98,8 +98,8 @@ blk_cleanup_queue(request_queue_t *queue);
 
 blk\_init\_queue()函数建立请求队列，并将该驱动程序的 request
 函数（通过第二个参数传递）关联到队列。在模块的清除阶段，调用
-blk\_cleanup\_queue() 函数。Mysdd 驱动程序使用下面的代码行初始化它的队列：  
-blk\_init\_queue(BLK\_DEFAULT\_QUEUE(major), Mysdd\_request);  
+blk\_cleanup\_queue() 函数。Mysbd 驱动程序使用下面的代码行初始化它的队列：  
+blk\_init\_queue(BLK\_DEFAULT\_QUEUE(major), Mysbd\_request);  
 
 每个设备有一个默认使用的请求队列，必要时，可使用 BLK\_DEFAULT\_QUEUE(major)
 宏得到该默认队列。这个宏在 blk\_dev\_struct 结构形成的全局数组（该数组名为
@@ -164,7 +164,7 @@ struct request {
 
 下面给出一个并不进行实际数据传输的最小 request 函数，应该如下定义：
 ```c
-void Mysdd _request(request_queue_t *q)
+void Mysbd _request(request_queue_t *q)
 {
         while(1) {
                 INIT_REQUEST;
@@ -181,23 +181,23 @@ request()函数从INIT\_REQUEST宏命令开始（它定义在blk.h中），它�
 
 假定队列中至少有一个请求，request()函数现在应处理队列中的第一个请求，当处理完请求后，request()函数将调用end\_request()函数。如果成功地完成了读写操作，应该用参数值1调用end\_request()函数；如果读写操作不成功，以参数值0调用end\_request()函数。如果队列中还有其他请求，将CURRENT指针设为指向下一个请求。执行end\_request()函数后，request()函数回到循环的起点，对下一个请求重复上面的处理过程。
 
-Mysdd 设备中能够完成实际工作的 request 函数如下：  
+Mysbd 设备中能够完成实际工作的 request 函数如下：  
 ```c
-void Mysdd_request(request_queue_t *q)
+void Mysbd_request(request_queue_t *q)
 {
-        Mysdd_Dev *device;
+        Mysbd_Dev *device;
         int status;
         while(1) {
                 INIT_REQUEST; /* 当请求队列为空时返回 */
                 /* 检查我们正在用的是哪一个设备*/
-                device = Mysdd_locate_device (CURRENT);
+                device = Mysbd_locate_device (CURRENT);
                 if (device == NULL) {
                         end_request(0);
                         continue;
                 }
         /* 数据传送并进行清理 */
         spin_lock(&device->lock);
-        status = Mysdd_transfer(device, CURRENT);
+        status = Mysbd_transfer(device, CURRENT);
         spin_unlock(&device->lock);
         end_request(status);
         }
@@ -205,21 +205,21 @@ void Mysdd_request(request_queue_t *q)
 ```
 上面的代码和前面给出的空 request
 函数几乎没有什么不同，该函数本身集中于请求队列的管理上，而将实际的工作交给其它函数完成。第一个函数是
-Mysdd\_locate\_device()，它检索请求当中的设备编号，并找出正确的 Mysdd\_Dev
-结构；第二个函数是Mysdd\_transfer()，它完成实际的I/O请求：
+Mysbd\_locate\_device()，它检索请求当中的设备编号，并找出正确的 Mysbd\_Dev
+结构；第二个函数是Mysbd\_transfer()，它完成实际的I/O请求：
 
 ```c
-static int Mysdd_transfer(Mysdd_Dev *device, const struct request *req)
+static int Mysbd_transfer(Mysbd_Dev *device, const struct request *req)
 {
         int size; /*要传送的数据大小*/
         u8 *ptr; /*指向存放数据的内存起始地址*/
         ...
         /* 进行传送 */
         switch(req->cmd) {
-        case READ:memcpy(req->buffer, ptr, size); /*从 Mysdd到缓冲区 */
+        case READ:memcpy(req->buffer, ptr, size); /*从 Mysbd到缓冲区 */
         return 1;
         case WRITE:
-        memcpy(ptr, req->buffer, size); /* 从缓冲区到 Mysdd */
+        memcpy(ptr, req->buffer, size); /* 从缓冲区到 Mysbd */
         return 1;
         default:
         /* 不可能发生 */
@@ -227,9 +227,9 @@ static int Mysdd_transfer(Mysdd_Dev *device, const struct request *req)
         }
 }
 ```
-因为 Mysdd 只是一个 RAM 磁盘，因此，该设备的“数据传输”只是一个 memcpy 调用而已。
+因为 Mysbd 只是一个 RAM 磁盘，因此，该设备的“数据传输”只是一个 memcpy 调用而已。
 
-块设备驱动程序初始化时，由驱动程序的init()完成。为了引导内核时调用init()，需要在blk\_dev\_init()函数中增加一行代码Mysdd\_init()。
+块设备驱动程序初始化时，由驱动程序的init()完成。为了引导内核时调用init()，需要在blk\_dev\_init()函数中增加一行代码Mysbd\_init()。
 
 块设备驱动程序初始化的工作主要包括：
 
@@ -241,26 +241,26 @@ static int Mysdd_transfer(Mysdd_Dev *device, const struct request *req)
 
 （4）将块设备驱动程序的数据容量传递给缓冲区：
 ```c
-#define Mysdd_HARDS_SIZE 512
-#define Mysdd_BLOCK_SIZE 1024
-static int Mysdd_hard = Mysdd_HARDS_SIZE;
-static int Mysdd_soft = Mysdd_BLOCK_SIZE;
-hardsect_size[Mysdd_MAJOR] = &Mysdd_hard;
-blksize_size[Mysdd_MAJOR] = &Mysdd_soft;
+#define Mysbd_HARDS_SIZE 512
+#define Mysbd_BLOCK_SIZE 1024
+static int Mysbd_hard = Mysbd_HARDS_SIZE;
+static int Mysbd_soft = Mysbd_BLOCK_SIZE;
+hardsect_size[Mysbd_MAJOR] = &Mysbd_hard;
+blksize_size[Mysbd_MAJOR] = &Mysbd_soft;
 ```
 
 在块设备驱动程序内核编译时，应把下列宏加到blk.h文件中：
 ```c
-#define MAJOR_NR Mysdd_MAJOR
-#define DEVICE_NAME “Mysdd”
-#define DEVICE_REQUEST Mysdd_request
+#define MAJOR_NR Mysbd_MAJOR
+#define DEVICE_NAME “Mysbd”
+#define DEVICE_REQUEST Mysbd_request
 #define DEVICE_NR(device) (MINOR(device))
 #define DEVICE_ON(device)
 #define DEVICE_OFF(device)
 ```
 （5）将request()函数的地址传递给内核：
 ```c
-blk_dev[Mysdd_MAJOR].request_fn = DEVICE_REQUEST;
+blk_dev[Mysbd_MAJOR].request_fn = DEVICE_REQUEST;
 ```
 
 以上只是一个简单的内存块设备驱动程序的示例,实际块驱动程序要比这复杂多，比较相近的例子如上一章讨论的romfs文件系统，在此不进一步讨论。
