@@ -109,7 +109,7 @@ $ls –li
 3.安装文件系统
 
 将一个文件系统的顶层目录挂到另一个文件系统的子目录上，使它们成为一个整体，称为“安装（mount）”。把该子目录称为“安装点(mount
-point)”，如图8.2。由于Ext2/Ext3是Linux的标准文件系统，所以系统把EXT2文件系统的磁盘分区做为系统的根文件系统，EXT2以外的文件系统(如Window的FAT32文件系统)则安装在根文件系统下的某个目录下，成为系统树型结构中的一个分枝。安装一个文件系统用mount命令。
+point)”，如图8.2。由于Ext4是Linux的标准文件系统，所以系统把EXT4文件系统的磁盘分区做为系统的根文件系统，EXT4以外的文件系统(如Window的FAT32文件系统)则安装在根文件系统下的某个目录下，成为系统树型结构中的一个分枝。安装一个文件系统用mount命令。
 
 <div align=center>
 <img src="图8_3.png" />  
@@ -148,23 +148,23 @@ $
 
 
 file.img文件现在作为一个块设备出现（由 /dev/loop0表示）。然后用 mke2fs 在这个设备上创建一个文件系统。这个命令创建一个指定大小的新的
-ext2 文件系统，见清单 2。
+ext4 文件系统，见清单 2。
 
-清单 2. 用循环设备创建 ext2 文件系统
+清单 2. 用循环设备创建 ext4 文件系统
 ```
-$ mke2fs -c /dev/loop0 10000 //在/dev/loop0块设备上创建大小为10MB的ext2文件系统  
+$ mke2fs -c /dev/loop0 10000 //在/dev/loop0块设备上创建大小为10MB的ext4文件系统  
 ... 
 $ 
 ```
 
 使用 mount 命令将循环设备（/dev/loop0）所表示的 file.img 文件安装到安装点
-/mnt/point1。注意，文件系统类型指定为 ext2。安装之后，就可以将这个安装点当作一个新的文件系统，比如使用ls 命令，见清单
+/mnt/point1。注意，文件系统类型指定为 ext4。安装之后，就可以将这个安装点当作一个新的文件系统，比如使用ls 命令，见清单
 3。
 
 清单 3. 创建安装点并通过循环设备安装文件系统
 ```
 $ mkdir /mnt/point1 //创建安装点 
-$ mount -t ext2 /dev/loop0 /mnt/point1 //在安装点上安装ext2文件系统 
+$ mount -t ext4 /dev/loop0 /mnt/point1 //在安装点上安装ext4文件系统 
 $ ls /mnt/point1 //查看文件系统 
 lost+found //新文件系统中的默认目录
 $ 
@@ -180,7 +180,7 @@ $ losetup /dev/loop1 /mnt/point1/file.img
 $ mke2fs -c /dev/loop1 1000 
 ... 
 $ mkdir /mnt/point2 
-$ mount -t ext2 /dev/loop1 /mnt/point2 
+$ mount -t ext4 /dev/loop1 /mnt/point2 
 $ ls /mnt/point2 //查看另一个新的文件系统
 lost+found 
 $ ls /mnt/point1 
