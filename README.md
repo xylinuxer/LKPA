@@ -13,7 +13,7 @@ Linux操作系统原理与应用第二版改编
 * 全文使用缩写LKPA来表示本书
 * 全书使用[Gitbook](https://www.gitbook.com/editor)编辑器来编写
 * 全书所有的图片统一使用visio2013和MindManage编辑
-* 全书所有的代码复合C99标准，使用[Linux kernel coding style](LinuxKernelCodingStyle.md)
+* 全书所有的代码符合C99标准，使用[Linux kernel coding style](LinuxKernelCodingStyle.md)
 * 首行缩进使用`&emsp;`
 
 ---
