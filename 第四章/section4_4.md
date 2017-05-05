@@ -10,27 +10,85 @@
 
 从虚拟内存的角度来看，页就是最小单位。体系结构不同，支持的页大小也不尽相同。有些体系结构甚至支持几种不同的页大小。大多数32位体系结构支持4KB的页，而64位体系结构一般会支持8KB的页。这就意味着，在支持4KB页大小并有1GB物理内存的机器上，物理内存会被划分为262144个页。
 
-内核用struct page结构表示系统中的每个物理页，也叫**页描述符**，该结构位于<linux/mm.h>中：
+内核用struct page结构表示系统中的每个物理页，也叫**页描述符**，该结构位于<linux/Mm_types.h>中：
 
 ```c
 struct page {
+	
+	unsigned long flags;				
+	struct address_space *mapping;	
+	struct {
+		union {
+			pgoff_t index;		
+			void *freelist;		
+			bool pfmemalloc;	
+		};
 
-		page_flags_t flags;
+		union {
+#if defined(CONFIG_HAVE_CMPXCHG_DOUBLE) && \
+	defined(CONFIG_HAVE_ALIGNED_STRUCT_PAGE)
+			unsigned long counters;
+#else
+			unsigned counters;
+#endif
 
-		atomic_t _count;
+			struct {
 
-		atomic_t _mapcount;
+				union {
+					atomic_t _mapcount;
 
-		unsigned long private;
+					struct { 
+						unsigned inuse:16;
+						unsigned objects:15;
+						unsigned frozen:1;
+					};
+					int units;	
+				};
+				atomic_t _count;		
+			};
+		};
+	};
 
-		struct address_space *mapping;
+	union {
+		struct list_head lru;	
+		struct {		
+			struct page *next;	
+#ifdef CONFIG_64BIT
+			int pages;	
+			int pobjects;	
+#else
+			short int pages;
+			short int pobjects;
+#endif
+		};
 
-		pgoff_t index;
+		struct list_head list;	
+		struct slab *slab_page;
+	};
 
-		struct list_head lru;
+	union {
+		unsigned long private;		
+#if USE_SPLIT_PTLOCKS
+		spinlock_t ptl;
+#endif
+		struct kmem_cache *slab_cache;
+		struct page *first_page;	
+	};
 
-		void *virtual;
+#if defined(WANT_PAGE_VIRTUAL)
+	void *virtual;			
+#endif 
+#ifdef CONFIG_WANT_PAGE_DEBUG_FLAGS
+	unsigned long debug_flags;	
+#endif
 
+#ifdef CONFIG_KMEMCHECK
+	void *shadow;
+#endif
+
+#ifdef LAST_NID_NOT_IN_PAGE_FLAGS
+	int _last_nid;
+#endif
 }
 ```
 
