@@ -251,7 +251,7 @@ struct mm_struct {
       <td>命令行参数所在的堆栈部分的起始地址和终止地址；环境串所在的堆栈部分的起始地址和终止地址</td>
    </tr>
    <tr>
-      <td>Rss，total_vm, locked_vm</td>
+      <td>rss，total_vm, locked_vm</td>
       <td>进程贮留在物理内存中的页面数，进程所需的总页数，被锁定在物理内存中的页数</td>
    </tr>
    <tr>
@@ -286,31 +286,21 @@ Area,简称VMA)，其定义如下：
 
 ```c
 struct vm_area_struct {
-
-   		struct mm_struct * vm_mm;
-
-  	 	unsigned long vm_start;
-
-   		unsigned long vm_end;
-
-   		struct vm_area_struct * vm_next;
-
-   		pgprot_t vm_page_prot;
-
-   		unsigned long vm_flags;
-
-   		struct rb_node_t vm_rb;
-
-   		struct vm_operations_struct * vm_ops;
-
-   		unsigned long vm_pgoff;
-
-  		struct file * vm_file;
-
-   		void * vm_private_data;
-
-   		……
-
+	unsigned long vm_start;		
+	unsigned long vm_end;		
+	struct vm_area_struct *vm_next, *vm_prev;
+	struct rb_node vm_rb;
+	unsigned long rb_subtree_gap;
+	struct mm_struct *vm_mm;	
+	pgprot_t vm_page_prot;		
+	unsigned long vm_flags;		
+	struct list_head anon_vma_chain; 
+	struct anon_vma *anon_vma;	
+	const struct vm_operations_struct *vm_ops;	
+	unsigned long vm_pgoff;		
+	struct file * vm_file;		
+	void * vm_private_data;		
+	...
 };
 ```
 
@@ -373,15 +363,21 @@ struct vm_area_struct {
 
 ```c
 struct vm_operations_struct {
-
-		void (*open)(struct vm_area_struct * area);
-
-		void (*close)(struct vm_area_struct * area);
-
-		struct page * (*nopage)(struct vm_area_struct * area, unsigned long address, int unused);
-
-		…;
-
+	void (*open)(struct vm_area_struct * area);
+	void (*close)(struct vm_area_struct * area);
+	int (*fault)(struct vm_area_struct *vma, struct vm_fault *vmf);
+	int (*page_mkwrite)(struct vm_area_struct *vma, struct vm_fault *vmf);
+	int (*access)(struct vm_area_struct *vma, unsigned long addr,
+		      void *buf, int len, int write);
+#ifdef CONFIG_NUMA
+	int (*set_policy)(struct vm_area_struct *vma, struct mempolicy *new);
+	struct mempolicy *(*get_policy)(struct vm_area_struct *vma,
+					unsigned long addr);
+	int (*migrate)(struct vm_area_struct *vma, const nodemask_t *from,
+		const nodemask_t *to, unsigned long flags);
+#endif
+	int (*remap_pages)(struct vm_area_struct *vma, unsigned long addr,
+			   unsigned long size, pgoff_t pgoff);
 };
 ```
 
@@ -698,7 +694,7 @@ $dmesg
 对fork()、exec()、exit（）这几个系统调用我们在第三章已经有所了解，下面说明在用户程序中如何调用mmap()，其原型为：
 
 ```c
-void *mmap (void *start , int length, int prot, int flags, int fd, int offset)
+void *mmap(struct file * file,struct vm_area_struct * vma)
 ```
 
 其中参数fd代表一个已打开的文件，offset为文件的起点，而start为映射到用户空间的起始地址，length则为长度（以字节为单位）。参数prot表示对所映射区间的访问模式，如可写、可读、可执行等，而flags用于其他控制目的：
