@@ -146,38 +146,46 @@ mm_strcut 用来描述一个进程的虚拟地址空间，在/include/linux/mm_t
 
 ```c
 struct mm_struct {
+	struct vm_area_struct * mmap;		
+	struct rb_root mm_rb;
+	struct vm_area_struct * mmap_cache;	
+#ifdef CONFIG_MMU
+	unsigned long (*get_unmapped_area) (struct file *filp,
+				unsigned long addr, unsigned long len,
+				unsigned long pgoff, unsigned long flags);
+	void (*unmap_area) (struct mm_struct *mm, unsigned long addr);
+#endif
+	unsigned long mmap_base;		
+	unsigned long mmap_legacy_base;         
+	unsigned long task_size;		
+	unsigned long cached_hole_size; 	
+	unsigned long free_area_cache;		
+	unsigned long highest_vm_end;		
+	pgd_t * pgd;
+	atomic_t mm_users;			
+	atomic_t mm_count;		
+	int map_count;				
 
-		struct vm_area_struct * mmap;
+	spinlock_t page_table_lock;		
+	struct rw_semaphore mmap_sem;
 
-		rb_root_t mm_rb;
+	struct list_head mmlist;		
 
-		struct vm_area_struct * mmap_cache;
+	unsigned long hiwater_rss;	
+	unsigned long hiwater_vm;	
 
-		pgd_t * pgd;
+	unsigned long total_vm;		
+	unsigned long locked_vm;	
+	unsigned long pinned_vm;	
+	unsigned long shared_vm;	
+	unsigned long exec_vm;		
+	unsigned long stack_vm;		
+	unsigned long def_flags;
+	unsigned long start_code, end_code, start_data, end_data;
+	unsigned long start_brk, brk, start_stack;
+	unsigned long arg_start, arg_end, env_start, env_end;
+	...
 
-		atomic_t mm_users;                                    
-
-   	 	atomic_t mm_count;                                    
-
-   		int map_count;
-
-   		struct rw_semaphore mmap_sem;
-
-   		spinlock_t page_table_lock;                                              
-
-   		struct list_head mmlist;
-
-   		unsigned long start_code, end_code, start_data, end_data;
-
-   		unsigned long start_brk, brk, start_stack;
-
-   		unsigned long arg_start, arg_end, env_start, env_end;
-
-   		unsigned long rss, total_vm, locked_vm;
-
-   		unsigned long def_flags;
-
-   		……
 };
 ```
 
