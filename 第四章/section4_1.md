@@ -50,14 +50,29 @@ Linux是为多用户多任务设计的操作系统, 所以存储资源要被多�
 我们来看一下在page.h头文件中对内核空间中地址映射的说明及定义：
 
 ```c
-#define __PAGE_OFFSET (0xC0000000)
-……
+#ifdef CONFIG_64BIT
+#define __PAGE_OFFSET	(0x40000000)	/* 1GB */
+#else
+#define __PAGE_OFFSET	(0x10000000)	/* 256MB */
+#endif
 
-#define PAGE_OFFSET ((unsigned long)__PAGE_OFFSET)
+#define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
 
-#define __pa(x) ((unsigned long)(x)-PAGE_OFFSET)
+/* The size of the gateway page (we leave lots of room for expansion) */
+#define GATEWAY_PAGE_SIZE	0x4000
 
-#define __va(x) ((void *)((unsigned long)(x)+PAGE_OFFSET))
+/* The start of the actual kernel binary---used in vmlinux.lds.S
+ * Leave some space after __PAGE_OFFSET for detecting kernel null
+ * ptr derefs */
+#define KERNEL_BINARY_TEXT_START	(__PAGE_OFFSET + 0x100000)
+
+/* These macros don't work for 64-bit C code -- don't allow in C at all */
+#ifdef __ASSEMBLY__
+#   define PA(x)	((x)-__PAGE_OFFSET)
+#   define VA(x)	((x)+__PAGE_OFFSET)
+#endif
+#define __pa(x)			((unsigned long)(x)-PAGE_OFFSET)
+#define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
 ```
 
 对于内核空间而言，给定一个虚地址x，其物理地址为“x-PAGE_OFFSET”，给定一个物理地址x，其虚地址为“x+ PAGE_OFFSET”。
