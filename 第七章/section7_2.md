@@ -29,33 +29,36 @@ Linux使用的同步机制可以说随着内核版本的不断发展而完善。
 
 表7.1 Linux中的原子操作
 
-**函数**                     |   **说明**
-------                       |   ---
-ATOMIC\_INIT(i)              |  在声明一个atomic\_t变量时, 将它初始化为i;
-                             |
-atomic\_read(v)              |   返回\*v。
-                             |
-atomic\_set(v,i)             |   把\*v置成i
-                             |
-atomic\_add(i,v)             |   给\*v增加i
-                             |  
-atomic\_sub(i,v)             |   从\*v中减去i
-                             |
-atomic\_sub\_and\_test(i, v) |   从\*v中减去i,如果结果为0，则返回1；否则，返回0
-                             |
-atomic\_inc(v)               |   把1加到 \*v
-                             |
-atomic\_dec(v)               |   从\*v减1
-                             |
-atomic\_dec\_and\_test(v)    |   从\*v减1，如果结果为0，则返回1；否则，返回0
-                             |
-atomic\_inc\_and\_test(v)    |   把1加到\*v，如果结果为0，则返回1；否则，返回0
-                             |
-atomic\_add\_negative(i, v)  |   把i加到\*v，如果结果为负，则返回1；否则，返回0
-                             |
-atomic\_add\_return(i, v)    |   把i加到\*v，并返回相加之后的值
-                             |
-atomic\_sub\_return(i, v)    |  从\*v中减去i,并返回相减之后的值
+|**函数**|**说明**|
+|------|---|
+|ATOMIC\_INIT(i)|在声明一个atomic\_t变量时, 将它初始化为i;|
+|||
+|atomic\_read(v)|返回\*v。|
+|||
+|atomic\_set(v,i) |把\*v置成i|
+|||
+|atomic\_add(i,v)|给\*v增加i|
+||| 
+|atomic\_sub(i,v)|从\*v中减去i|
+|||
+|atomic\_sub\_and\_test(i, v) |   从\*v中减去i,如果结果为0，则返回1；否则，返回0|
+|||
+|atomic\_inc(v)|   把1加到 \*v|
+|||
+|atomic\_dec(v) |   从\*v减1|
+| ||
+|atomic\_dec\_and\_test(v) |   从\*v减1，如果结果为0，则返回1；否则，返回0|
+|||
+|atomic\_inc\_and\_test(v)    |   把1加到\*v，如果结果为0，则返回1；否则，返回0|
+|||
+|atomic\_add\_negative(i, v)  |   把i加到\*v，如果结果为负，则返回1；否则，返回0|
+|||
+|atomic\_add\_return(i, v)    |   把i加到\*v，并返回相加之后的值|
+|||
+|atomic\_sub\_return(i, v)    |  从\*v中减去i,并返回相减之后的值|
+
+
+
 
 &emsp;&emsp;下面举例说明这些函数的用法：
 
@@ -301,26 +304,26 @@ DEFINE\_SEMAPHORE(name);
 
 &emsp;&emsp;同自旋锁一样，信号量在内核中也有许多变种，比如读者－写者信号量等，这里不做一一介绍。下表是信号量的操作函数列表：
 
-函数                       |     描述                          
-------                     |    ---                           
-                           |                    
-down(struct semaphore \*); | 获取信号量，如果不可获取，
-                           | 则进入不可中断睡眠状态（目前已经不建议使用）。
-                           |
-down\_interruptible        | 获取信号量，如果不可获取，               
-(struct semaphore \*);     | 则进入可中断睡眠状态。
-                           |
-down\_killable             | 获取信号量，如果不可获取，
-(struct semaphore \*);     | 则进入可被致命信号中断的睡眠状态。 
-                           |
-down\_trylock              |  尝试获取信号量，
-(struct semaphore \*);     |  如果不能获取，则立刻返回。
-                           |
-down\_timeout              | 在给定时间（jiffies）
-(struct semaphore \*,      | 内获取信号量，如果不能够获取，
-long jiffies);             | 则返回。
-                           | 
-up(struct semaphore \*);   | 释放信号量。 
+|函数                       |     描述  |                        
+|------                     |    ---|                           
+|                           |     |               
+|down(struct semaphore \*); | 获取信号量，如果不可获取，|
+|                           | 则进入不可中断睡眠状态（目前已经不建议使用）。|
+|                           ||
+|down\_interruptible        | 获取信号量，如果不可获取，|               
+|(struct semaphore \*);     | 则进入可中断睡眠状态。|
+|                           ||
+|down\_killable             | 获取信号量，如果不可获取，|
+|(struct semaphore \*);     | 则进入可被致命信号中断的睡眠状态。 |
+|                          ||
+|down\_trylock              |  尝试获取信号量，|
+|(struct semaphore \*);     |  如果不能获取，则立刻返回。|
+ |                          ||
+|down\_timeout              | 在给定时间（jiffies）|
+|(struct semaphore \*,      | 内获取信号量，如果不能够获取，|
+|long jiffies);             | 则返回。|
+|                           | |
+|up(struct semaphore \*);   | 释放信号量。 |
 
 #### 4.信号量和自旋锁区别
 
