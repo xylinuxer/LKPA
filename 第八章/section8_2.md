@@ -1,15 +1,11 @@
 ## 8.2 虚拟文件系统
 
-&emsp;&emsp;为了保证Linux的开放性，设计人员必须考虑如何使Linux除支持Ext2文件系统外，还能支持其他各种不同的文件系统，例如日志型文件系统，集群文件系统以及加密文件系统等。为此，就必须将各种不同文件系统的操作和管理纳入到一个统一的框架中，使得用户程序可以通过同一个文件系统界面，也就是同一组系统调用，能够对各种不同的文件系统以及文件进行操作。这样，用户程序就可以不关心各种不同文件系统的实现细节，而使用系统提供的统一、抽象、虚拟的文件系统界面。这种统一的框架就是所谓的虚拟文件系统转换（Virtual
-Filesystem Switch），一般简称 **虚拟文件系统 (VFS)**。
+&emsp;&emsp;为了保证Linux的开放性，设计人员必须考虑如何使Linux除支持Ext4文件系统外，还能支持其他各种不同的文件系统，例如集群文件系统以及加密文件系统等。为此，就必须将各种不同文件系统的操作和管理纳入到一个统一的框架中，使得用户程序可以通过同一个文件系统界面，也就是同一组系统调用，能够对各种不同的文件系统以及文件进行操作。这样，用户程序就可以不关心各种不同文件系统的实现细节，而使用系统提供的统一、抽象、虚拟的文件系统界面。这种统一的框架就是所谓的虚拟文件系统转换（Virtual Filesystem Switch），一般简称 **虚拟文件系统 (VFS)**。
 
 ### 8.2.1虚拟文件系统的引入
 
-&emsp;&emsp;Linux最初采用的是Minix的文件系统，但是，Minix是一种教学用操作系统，其文件系统的大小限于64MB，文件名长度也限于14个字节。所以，Linux经过一段时间的改进和发展，特别是吸取了Unix文件系统多年改进所积累的经验，最后形成了Ext2文件系统。可以说，
-Ext2文件系统就是Linux文件系统。
-
+&emsp;&emsp;Linux最初采用的是Minix的文件系统，但是，Minix是一种教学用操作系统，其文件系统的大小限于64MB，文件名长度也限于14个字节。所以，Linux经过一段时间的改进和发展，特别是吸取了Unix文件系统多年改进所积累的经验，最后形成了Ext4文件系统。可以说，Ext4文件系统就是Linux文件系统。
 &emsp;&emsp;虚拟文件系统所提供的抽象界面主要由一组标准的、抽象的操作构成，例如read()、write()、lseek等，这些函数以系统调用的形式供用户程序调用。这样，用户程序调用这些系统调用时，根本无需关心所操作的文件属于哪个文件系统，这个文件系统是怎样设计和实现的。
-
 &emsp;&emsp;Linux内核中，VFS与具体文件系统的关系如图8.4所示：
 
 <div align=center>
@@ -20,18 +16,12 @@ Ext2文件系统就是Linux文件系统。
 图8.4 VFS与具体文件系统之间的关系	
 </div>
 
-&emsp;&emsp;Linux的目录建立了一棵根目录为“/ ”的树。根目录包含在**根文件系统**中，在Linux
-中，这个根文件系统通常就是Ext2类型。其他所有的文件系统都可以被“安装”在根文件系统的子目录中。例如，用户可以通过“mount”命令，将DOS格式的磁盘分区（即FAT文件系统）安装到Linux系统中，然后，用户就可以像访问Ext2文件一样访问DOS的文件。
-
+&emsp;&emsp;Linux的目录建立了一棵根目录为“/ ”的树。根目录包含在**根文件系统**中，在Linux中，这个根文件系统通常就是Ext4类型。其他所有的文件系统都可以被“安装”在根文件系统的子目录中。例如，用户可以通过“mount”命令，将DOS格式的磁盘分区（即FAT文件系统）安装到Linux系统中，然后，用户就可以像访问Ext4文件一样访问DOS的文件。
 &emsp;&emsp;例如：假设用户输入以下shell命令：
 ```
     $ cp /mnt/dos/TEST /tmp/test
 ```
-&emsp;&emsp;其中 /mnt/dos 是 DOS 磁盘的一个安装点，而 /tmp 是一个标准的第二扩展文件系统（
-Ext2）的目录。 如图8.4所示, VFS
-是用户的应用程序与具体文件系统之间的抽象层。因此， cp
-程序并不需要知道/mnt/dos/TEST 和 /tmp/test是什么文件系统类型。相反, cp
-程序通过系统调用直接与VFS交互。cp 所执行的代码片段如下：
+&emsp;&emsp;其中 /mnt/dos 是 DOS 磁盘的一个安装点，而 /tmp 是一个标准的第二扩展文件系统（Ext4）的目录。 如图8.4所示, VFS是用户的应用程序与具体文件系统之间的抽象层。因此， cp程序并不需要知道/mnt/dos/TEST 和 /tmp/test是什么文件系统类型。相反, cp程序通过系统调用直接与VFS交互。cp 所执行的代码片段如下：
 ```c
     inf=open("/mnt/dos/TEST",O_RDONLY,O);
 
@@ -42,9 +32,7 @@ Ext2）的目录。 如图8.4所示, VFS
             write(outf,buf,l);
     }while(l);
 ```
-&emsp;&emsp;为了进一步理解图8.4，结合上面的程序片段，我们来说明内核如何把read(
-)转换为专对DOS文件系统的一个调用。应用程序对read( )的调用引起内核调用sys\_read(
-)，这完全与其他系统调用类似。我们在本章后面会看到，文件在内核中是由一个file数据结构来表示的：
+&emsp;&emsp;为了进一步理解图8.4，结合上面的程序片段，我们来说明内核如何把read()转换为专对DOS文件系统的一个调用。应用程序对read( )的调用引起内核调用sys\_read()，这完全与其他系统调用类似。我们在本章后面会看到，文件在内核中是由一个file数据结构来表示的：
 ```c
     struct file{
             ...
@@ -82,7 +70,7 @@ Ext2）的目录。 如图8.4所示, VFS
 &emsp;&emsp;file-\>f\_op-\>read(...);
 
 &emsp;&emsp;与之类似，write( ) 操作也会引发一个与输出文件相关的
-Ext2写函数(而不是DOS文件系统的写函数）执行。
+Ext4写函数(而不是DOS文件系统的写函数）执行。
 
 &emsp;&emsp;由此可以看出，如果把内核比拟为PC机中的“母板”，把VFS比拟为“母板”上的一个“插槽”，那么，每个具体的文件系统就好像一块块“接口卡”。不同的接口卡上有不同的电子线路，但是，它们与插槽的连接有几条线，每条线做什么有明确的定义。同样，不同的文件系统通过不同的程序来实现其各种功能，但是，与VFS之间的界面则是有明确定义的。这个界面就是file\_operation()结构。
 
@@ -118,7 +106,7 @@ Inode）,为什么不叫文件控制块而叫索引节点，主要是因为有�
 ### 8.2.3 VFS的超级块
 
 &emsp;&emsp;超级块用来描述整个文件系统的信息。对每个具体的文件系统来说,都有各自的超级块,
-如Ext2或Ext3超级块，他们存放于磁盘。当内核在对一个文件系统进行初始化和注册时在内存为其分配一个超级块，这就是VFS超级块。也就是说,
+如Ext3或Ext4超级块，他们存放于磁盘。当内核在对一个文件系统进行初始化和注册时在内存为其分配一个超级块，这就是VFS超级块。也就是说,
 VFS超级块是各种具体文件系统在安装时建立的，并在这些文件系统卸载时被自动删除，可见，VFS超级块只存在于内存中。
 
 1. 超级块数据结构
@@ -127,51 +115,44 @@ VFS超级块的数据结构为super\_block，该结构及其主要域的含义�
 ```c
 struct super_block
 {
+        struct list_head  s_list;  /*指向超级块链表的指针*/
         dev_t s_dev; /*具体文件系统的块设备标识符。 例如，对于 /dev/hda1，其设备标识符为 0x301*/
-        unsigned long s_blocksize; /*以字节为单位数据块的大小*/
         unsigned char s_blocksize_bits; /*块大小的值占用的位数，例如， 如果块大小为1024字节，则该值为10*/
-        ...
-        struct list_head s_list; /*指向超级块链表的指针*/
+        unsigned long s_blocksize; /*以字节为单位数据块的大小*/
+        loff_t  s_maxbytes;	/* 最大文件大小*/
         struct file_system_type *s_type; /*指向文件系统的file_system_type 数据结构的指针*/
         struct super_operations *s_op; /*指向具体文件系统的用于超级块操作的函数集合 */
-        struct mutex s_lock;
-        struct list_head s_dirty; /* dirty inodes */
         ...
         void * s_fs_info; /*指向具体文件系统的超级块*/
 };
 ```
 所有超级块对象都以双向循环链表的形式链接在一起。链表中第一个元素用**super\_blocks**变量来表示。
 
-&emsp;&emsp;其中的s\_list字段存放指向链表相邻元素的指针。sb\_lock自旋锁保护链表免受多处理器系统上的同时访问。s\_fs\_info字段指向具体文件系统的超级块；例如，假如超级块对象指的是Ext2文件系统，该字段就指向ext2\_sb\_info数据结构，该结构包括与磁盘分配位图等相关数据，不包含与VFS的通用文件模型相关的数据。
-
+&emsp;&emsp;其中的s\_list字段存放指向链表相邻元素的指针。s\_fs\_info字段指向具体文件系统的超级块；例如，假如超级块对象指的是Ext2文件系统，该字段就指向ext2\_sb\_info数据结构，该结构包括与磁盘分配位图等相关数据，不包含与VFS的通用文件模型相关的数据。
 &emsp;&emsp;通常，为了效率起见，由s\_fs\_info字段所指向的数据被复制到内存。任何磁盘文件系统都需要访问和更改自己的磁盘分配位图，以便分配或释放磁盘块。VFS允许这些文件系统直接对内存超级块的s\_fs\_info字段进行操作，而无需访问磁盘。
-
-&emsp;&emsp;但是，这种方法带来一个新问题：有可能VFS超级块最终不再与磁盘上相应的超级块同步。因此，有必要引入一个s\_dirt标志，来表示该超级块是否是脏的，也就是说，磁盘上的数据是否必须要更新。缺乏同步还导致我们熟悉的一个问题：当一台机器的电源突然断开而用户来不及正常关闭系统时，就会出现文件系统崩溃。Linux是通过周期性地将所有“脏”的超级块写回磁盘来减少该问题带来的危害。
-
 &emsp;&emsp;与超级块关联的方法就是所谓的超级块操作表。这些操作是由数据结构super\_operations来描述的，其主要函数如下：
 
 ```c
 struct super_operations {
-        void (*write_super) (struct super_block *);
-        void (*put_super) (struct super_block *);
-        void (*read_inode) (struct inode *);
-        void (*write_inode) (struct inode *, int);
-        void (*put_inode) (struct inode *);
-        void (*delete_inode) (struct inode *);
+struct inode *(*alloc_inode)(struct super_block *sb);
+void (*destroy_inode)(struct inode *);
+void (*dirty_inode) (struct inode *, int flags);
+int (*write_inode) (struct inode *, struct writeback_control *wbc);
+int (*drop_inode) (struct inode *);
+void (*evict_inode) (struct inode *);
+void (*put_super) (struct super_block *);
+int (*sync_fs)(struct super_block *sb, int wait);
         ...
 }
 ```
 
 &emsp;&emsp;每一种文件系统都应该有自己的super\_operations操作实例。其主要函数的功能简述如下
 ：
-
-&emsp;&emsp;wirte\_super()：将超级块的信息写回磁盘
-
 &emsp;&emsp;put\_super（）释放超级块对象。
 
-&emsp;&emsp;read\_inode（）和write\_inode（）：分别从磁盘读取某个文件系统的inode，或把inode写回磁盘。
+&emsp;&emsp;write\_inode（）：把inode写回磁盘。
 
-&emsp;&emsp;put\_inode（）和delete\_inode（）：都是释放索引节点，前者仅仅是逻辑上的释放，而后者是从磁盘上物理地删除。
+&emsp;&emsp;destroy\_inode（）和drop\_inode（）：都是释放索引节点，前者仅仅是逻辑上的释放，而后者是从磁盘上物理地删除。
 
 ### 8.2.4 VFS的索引节点
 
