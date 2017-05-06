@@ -25,125 +25,178 @@ IDT表项的设置是通过\_set\_gaet\(\)函数实现的，在此，我们给�
 ```c
 static inline void set_intr_gate(unsigned int n, void *addr)
 {
-	BUG_ON((unsigned)n > 0xFF);
-	_set_gate(n, GATE_INTERRUPT, addr, 0, 0, __KERNEL_CS);
+    BUG_ON((unsigned)n > 0xFF);
+    _set_gate(n, GATE_INTERRUPT, addr, 0, 0, __KERNEL_CS);
 }
-
 ```
 
-其中，idt\_table是中断描述符表IDT在程序中的符号表示，n表示在第n个表项中插入一个中断门。这个门的段选择符设置成代码段的选择符，DPL域设置成0，14表示D标志位为1（表示32位）而类型码为110，所以set\_intr\_gate（）设置的是中断门，偏移域设置成中断处理程序的地址addr。
+其中，n是中断号，addr是中断处理程序的入口地址，GATE\_INTERRUPT是中断门类型，这样我们能看出来这是一个中断门。
 
 #### 2. 插入一个陷阱门
 
 ```c
-static void __init set_trap_gate(unsigned int n, void *addr)
-
+static inline void set_trap_gate(unsigned int n, void *addr)
 {
-
-        _set_gate(idt_table+n,15,0,addr);
-
+    BUG_ON((unsigned)n > 0xFF);
+    _set_gate(n, GATE_TRAP, addr, 0, 0, __KERNEL_CS);
 }
 ```
 
-在第n个表项中插入一个陷阱门。这个门的段选择符设置成代码段的选择符，DPL域设置成0，15表示D标志位为1而类型码为111，所以set\_trap\_gate（）设置的是陷阱门，偏移域设置成异常处理程序的地址addr。
+可以看到传入的参数是GATE\_TRAP，所以是一个陷阱门。其他参数如中断门所讲的一样。
 
 #### 插入一个系统门
 
 ```c
-static void __init set_system_gate(unsigned int n, void *addr)
-
+static inline void set_system_trap_gate(unsigned int n, void *addr)
 {
+    BUG_ON((unsigned)n > 0xFF);
+    _set_gate(n, GATE_TRAP, addr, 0x3, 0, __KERNEL_CS);
+}
+```
 
-        _set_gate(idt_table+n,15,3,addr);
+可以看到传入的参数是GATE\_TRAP，所以是系统门。其他的参数如同中断门讲述的一样。
+
+### 5.2.2 对陷阱门、系统门和中断门的初始化
+
+trap\_init\(\)函数就是设置中断描述符表开头的19个陷阱门，这些中断向量都是CPU保留用于异常处理的：
+
+```c
+    /**
+     *X86_TRAP_DE = 0,    /*  0, Divide-by-zero */
+     *X86_TRAP_DB,        /*  1, Debug */
+     *X86_TRAP_NMI,        /*  2, Non-maskable Interrupt */
+     *X86_TRAP_BP,        /*  3, Breakpoint */
+     *X86_TRAP_OF,        /*  4, Overflow */
+     *X86_TRAP_BR,        /*  5, Bound Range Exceeded */
+     *X86_TRAP_UD,        /*  6, Invalid Opcode */
+     *X86_TRAP_NM,        /*  7, Device Not Available */
+     *X86_TRAP_DF,        /*  8, Double Fault */
+     *X86_TRAP_OLD_MF,    /*  9, Coprocessor Segment Overrun */
+     *X86_TRAP_TS,        /* 10, Invalid TSS */
+     *X86_TRAP_NP,        /* 11, Segment Not Present */
+     *X86_TRAP_SS,        /* 12, Stack Segment Fault */
+     *X86_TRAP_GP,        /* 13, General Protection Fault */
+     *X86_TRAP_PF,        /* 14, Page Fault */
+     *X86_TRAP_SPURIOUS,    /* 15, Spurious Interrupt */
+     *X86_TRAP_MF,        /* 16, x87 Floating-Point Exception */
+     *X86_TRAP_AC,        /* 17, Alignment Check */
+     *X86_TRAP_MC,        /* 18, Machine Check */
+     *X86_TRAP_XF,        /* 19, SIMD Floating-Point Exception */
+     **/
+    set_intr_gate(X86_TRAP_DE, &divide_error);
+    set_intr_gate_ist(X86_TRAP_NMI, &nmi, NMI_STACK);
+    /* int4 can be called from all */
+    set_system_intr_gate(X86_TRAP_OF, &overflow);
+    set_intr_gate(X86_TRAP_BR, &bounds);
+    set_intr_gate(X86_TRAP_UD, &invalid_op);
+    set_intr_gate(X86_TRAP_NM, &device_not_available);
+#ifdef CONFIG_X86_32
+    set_task_gate(X86_TRAP_DF, GDT_ENTRY_DOUBLEFAULT_TSS);
+#else
+    set_intr_gate_ist(X86_TRAP_DF, &double_fault, DOUBLEFAULT_STACK);
+#endif
+    set_intr_gate(X86_TRAP_OLD_MF, &coprocessor_segment_overrun);
+    set_intr_gate(X86_TRAP_TS, &invalid_TSS);
+    set_intr_gate(X86_TRAP_NP, &segment_not_present);
+    set_intr_gate(X86_TRAP_SS, stack_segment);
+    set_intr_gate(X86_TRAP_GP, &general_protection);
+    set_intr_gate(X86_TRAP_SPURIOUS, &spurious_interrupt_bug);
+    set_intr_gate(X86_TRAP_MF, &coprocessor_error);
+    set_intr_gate(X86_TRAP_AC, &alignment_check);
+#ifdef CONFIG_X86_MCE
+    set_intr_gate_ist(X86_TRAP_MC, &machine_check, MCE_STACK);
+#endif
+    set_intr_gate(X86_TRAP_XF, &simd_coprocessor_error);
+    for (i = 0; i < FIRST_EXTERNAL_VECTOR; i++)
+        set_bit(i, used_vectors);
+
+#ifdef CONFIG_IA32_EMULATION
+    set_system_intr_gate(IA32_SYSCALL_VECTOR, ia32_syscall);
+    set_bit(IA32_SYSCALL_VECTOR, used_vectors);
+#endif
+
+#ifdef CONFIG_X86_32
+    set_system_trap_gate(SYSCALL_VECTOR, &system_call);
+    set_bit(SYSCALL_VECTOR, used_vectors);
+#endif
 
 }
 ```
 
-在第n个表项中插入一个系统门。这个门的段选择符设置成代码段的选择符，DPL域设置成3，15表示D标志位为1而类型码为111，所以set\_system\_gate（）设置的也是陷阱门，但因为DPL为3，因此，系统调用在用户态可以通过“INT0x80”顺利穿过系统门，从而进入内核态。
-
-### 5.2.2 对陷阱门和系统门的初始化
-
-trap\_init\(\)函数就是设置中断描述符表开头的19个陷阱门和系统门，这些中断向量都是CPU保留用于异常处理的：
-
-```c
-set_trap_gate(0,&divide_error);
-
-set_trap_gate(1,&debug);
-
-……
-
-set_trap_gate(19,&simd_coprocessor_error);
-
-set_system_gate(SYSCALL_VECTOR,&system_call);
-```
-
 其中，“&”之后的名字就是每个异常处理程序的名字。最后一个是对系统调用的设置。
 
-### 5.2.3 中断门的设置
+set\_system\_intr\_gate\(IA32\_SYSCALL\_VECTOR, ia32\_syscall\);这个是对系统中断门进行初始化。
 
-中断门的设置是由init\_IRQ\(\)函数中的一段代码完成的：
+set\_system\_trap\_gate\(SYSCALL\_VECTOR, &system\_call\);这个是对系统门进行初始化。
+
+### 5.2.3 初始化中断
+
+内核是在异常和陷阱初始化完成的情况下才会进行中断的初始化，中断的初始化也是处于start\_kernel\(\)函数中，分为两个部分，分别是early\_irq\_init\(\)和init\_IRQ\(\)。early\_irq\_init\(\)是第一步的初始化，其工作主要是跟硬件无关的一些初始化，比如一些变量的初始化，分配必要的内存等。init\_IRQ\(\)是第二步，其主要就是关于硬件部分的初始化了。
+
+那让我们来看一下最主要的init\_IRQ\(\)实现了什么。
 
 ```c
-for (i = 0; i < (NR_VECTORS - FIRST_EXTERNAL_VECTOR); i++) {  
-        int vector = FIRST_EXTERNAL_VECTOR + i;  
-        if (i >= NR_IRQS)  
-                break;  
-        if (vector != SYSCALL_VECTOR)  
-        set_intr_gate(vector, interrupt[i]);  
-   }
+void __init init_IRQ(void)
+{
+    int i;
+    x86_add_irq_domains();
+    for (i = 0; i < legacy_pic->nr_legacy_irqs; i++)
+        per_cpu(vector_irq, 0)[IRQ0_VECTOR + i] = i;
+
+    x86_init.irqs.intr_init();
+}
 ```
 
-从FIRST\_EXTERNAL\_VECTOR开始，设置NR\_IRQS（NR\_VECTORS - FIRST\_EXTERNAL\_VECTOR）个IDT表项。常数FIRST\_EXTERNAL\_VECTOR定义为0x20，而NR\_IRQS则为224[^1]，即中断门的个数。注意，必须跳过用于系统调用的向量0x80，因为这在前面已经设置好了。  
-这里，中断处理程序的入口地址是一个数组interrupt\[\]，数组中的每个元素是指向中断处理函数的指针。
+x86\_init.irqs.intr\_init\(\)是一个函数指针，其指向native\_init\_IRQ\(\);我们可以直接看看native\_init\_IRQ\(\);
+
+```c
+void __init native_init_IRQ(void)
+{
+    int i;
+
+    x86_init.irqs.pre_vector_init();
+
+    apic_intr_init();
+
+    i = FIRST_EXTERNAL_VECTOR;
+    for_each_clear_bit_from(i, used_vectors, NR_VECTORS) {
+        set_intr_gate(i, interrupt[i - FIRST_EXTERNAL_VECTOR]);
+    }
+
+    if (!acpi_ioapic && !of_ioapic)
+        setup_irq(2, &irq2);
+
+#ifdef CONFIG_X86_32
+    irq_ctx_init(smp_processor_id());
+#endif
+}
+```
+
+interrupt\[\]就是中断程序的入口地址，外部中断的门描述的中断处理函数都为interrupt\[i\]。
 
 ### 5.2.4 中断处理程序的形成
 
 由前一节知道，interrupt\[\]为中断处理程序的入口地址，这只是一个笼统的说法。实际上不同的中断处理程序，不仅名字不同，其内容也不同，但是，这些函数又有很多相同之处，因此应当以统一的方式形成其函数名和函数体，于是，内核对该数组的定义如下：
 
 ```c
-static void (*interrupt[NR_VECTORS - FIRST_EXTERNAL_VECTOR])(void) = {
-
-IRQLIST_16(0x2), IRQLIST_16(0x3),
-
-IRQLIST_16(0x4), IRQLIST_16(0x5), IRQLIST_16(0x6), IRQLIST_16(0x7),
-
-IRQLIST_16(0x8), IRQLIST_16(0x9), IRQLIST_16(0xa), IRQLIST_16(0xb),
-
-IRQLIST_16(0xc), IRQLIST_16(0xd), IRQLIST_16(0xe), IRQLIST_16(0xf)
-
- };
+static void (*interrupt[NR_IRQS])(void) = {
+    NULL, NULL, IRQ2_interrupt, IRQ3_interrupt,
+    IRQ4_interrupt, IRQ5_interrupt, IRQ6_interrupt, IRQ7_interrupt,
+    IRQ8_interrupt, IRQ9_interrupt, IRQ10_interrupt, IRQ11_interrupt,
+    IRQ12_interrupt, IRQ13_interrupt, NULL, NULL,    
+    IRQ16_interrupt, IRQ17_interrupt, IRQ18_interrupt, IRQ19_interrupt,    
+    IRQ20_interrupt, IRQ21_interrupt, IRQ22_interrupt, IRQ23_interrupt,    
+    IRQ24_interrupt, IRQ25_interrupt, NULL, NULL, NULL, NULL, NULL,
+    IRQ31_interrupt
+};
 ```
 
-这里定义的数组interrupt\[\]，从IRQLIST\_16\(0x2\)到IRQLIST\_16\(0xf\)一共有14个数组元素，其中IRQLIST\_16\(\)宏的定义如下：
+nterrupt\[i\]的每个元素都相同，执行相同的汇编代码，这段汇编代码实际上很简单，它主要工作就是将**中断向量号**和**被中断上下文**
 
-```c
-  #define IRQLIST_16(x) 
+\(进程上下文或者中断上下文\)保存到栈中，最后调用do\_IRQ函数。 从IRQ2\_interrupt一直到IRQ31\_interupt。那么这些函数名又是如何形成的？我们看如下宏定义：
 
-  IRQ(x,0), IRQ(x,1), IRQ(x,2), IRQ(x,3), 
-
-  IRQ(x,4), IRQ(x,5), IRQ(x,6), IRQ(x,7), 
-
-  IRQ(x,8), IRQ(x,9), IRQ(x,a), IRQ(x,b), 
-
-  IRQ(x,c), IRQ(x,d), IRQ(x,e), IRQ(x,f)
 ```
-
-该宏中定义了16个IRQ\(x,y\)，这样就有224（14\*16）个函数指针。不妨再接着展开IRQ\(x,y\)宏：
-
-```c
-#define IRQ(x,y) 
-
-IRQ##x##y##_interrupt
-
-## 表示将字符串连接起来，比如IRQ(0x2,0)就是IRQ0x20_interrupt。
-```
-
-综上可知，以这样的方式就定义出224个函数，从  
-IRQ0x20\_interrupt一直到IRQ0xff\_interupt。那么这些函数名又是如何形成的？我们看如下宏定义：
-
-```c
 #define IRQ_NAME2(nr) nr##_interrupt(void)
-
 #define IRQ_NAME(nr) IRQ_NAME2(IRQ##nr)
 ```
 
@@ -153,11 +206,13 @@ BUILD\_IRQ宏是一段嵌入式汇编代码，为了有助于理解，我们把�
 
 ```c
 IRQn_interrupt:
-
-            pushl $n-256
-
-jmp common_interrupt
+                pushl $n-256
+                jmp common_interrupt
 ```
 
 把中断号减256的结果保存在栈中，这是进入中断处理程序后第一个压入堆栈的值，是一个负数，正数留给系统调用使用。对于每个中断处理程序，唯一不同的就是压入栈中的这个数。然后，所有的中断处理程序都跳到一段相同的代码common\_interrupt。关于这段代码，请参看5.3.3一节中断处理程序IRQn\_interrupt。
+
+
+
+
 

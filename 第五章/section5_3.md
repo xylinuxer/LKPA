@@ -30,97 +30,88 @@
 
 #### 1 中断服务程序与中断处理程序
 
-我们这里提到的**中断服务程序ISR**（Interrupt Service Routine）与以前所提到的**中断处理程序**(Interrupt handler)是两个不同的概念。在Linux中，15条中断线对应15个中断处理程序，其名依次为IRQ0x00_interrupt()，IRQ0x01_interrupt()……IRQ0x0f_interrupt()。具体来说，中断处理程序相当于某个中断向量的总处理程序，例如IRQ0x05_interrupt()是中断号5（向量为37）的总处理程序，如果这个5号中断由网卡和图形卡共享，则网卡和图形卡分别有其相应的中断服务程序。
+我们这里提到的**中断服务程序ISR**（Interrupt Service Routine）与以前所提到的**中断处理程序**(Interrupt handler)是两个不同的概念。在Linux中，15条中断线对应15个中断处理程序，其名依次为IRQ2_interrupt, IRQ3_interrupt,...,IRQ16_interrupt。具体来说，中断处理程序相当于某个中断向量的总处理程序，例如IRQ5_interrupt是中断号5（向量为37）的总处理程序，如果这个5号中断由网卡和图形卡共享，则网卡和图形卡分别有其相应的中断服务程序。
 
 #### 2 中断线共享的数据结构
 
 为了让多个设备能共享一条中断线而内核设置了一个叫irqaction的数据结构：
 
 ```c
-typedef irqreturn_t (*irq_handler_t)(int, void *);
+struct irqaction {
+	irq_handler_t		handler;
+	void			*dev_id;
+	void __percpu		*percpu_dev_id;
+	struct irqaction	*next;
+	irq_handler_t		thread_fn;
+	struct task_struct	*thread;
+	unsigned int		irq;
+	unsigned int		flags;
+	unsigned long		thread_flags;
+	unsigned long		thread_mask;
+	const char		*name;
+	struct proc_dir_entry	*dir;
+} ____cacheline_internodealigned_in_smp;
 
-		struct irqaction {
-
-		irq_handler_t handler;
-
-		unsigned long flags;
-
-		cpumask_t mask;
-
-		const char *name;
-
-		void *dev_id;
-
-		struct irqaction *next;
-
-		int irq;
-
-		…
-
-};
 ```
 
 对每个域描述如下：
 
-handler
+(1) handler
 
 指向一个具体I/O设备的中断服务程序，该函数有两个参数，第一个参数为中断号IRQ，第二个参数为void指针，该指针一般传入dev_id（唯一地标示某个设备的设备号）的值。
 
-flags
+(2) flags
 
 用一组标志描述中断线与I/O设备之间的关系。
 
-IRQF_DISABLED
+① IRQF_DISABLED
 
 中断处理程序执行时必须禁止中断
 
-IRQF_SHARED
+② IRQF_SHARED
 
 允许其它设备共享这条中断线。
 
-IRQF_SAMPLE_RANDOM
+③ IRQF_SAMPLE_RANDOM
 
 可以把这个设备看作是随机事件发生源；因此，内核可以用它做随机数产生器。
 
-name
+(3) name
 
 I/O设备名
 
-dev_id
+(4) dev_id
 
 指定I/O设备的主设备号和次设备号(参见第9章)。
 
-next
+(5) next
 
 指向irqaction描述符链表的下一个元素，前提是flags为IRQF_SHARED标志。共享同一中断线的每个硬件设备都有其对应的中断服务程序，链表中的每个元素就是对相应设备及中断服务程序的描述。
 
 #### 3 注册中断服务程序
 
-在IDT表初始化完成之初，每个中断服务队列还为空。此时，即使打开中断且某个外设中断真的发生了，也得不到实际的服务。因为CPU虽然通过中断门进入了某个中断向量的总处理程序，例如IRQ0x05_interrupt()，但是，具体的中断服务程序（如图形卡的）还没有挂入中断请求队列。因此，在设备驱动程序的初始化阶段，必须通过request_irq()函数将相应的中断服务程序挂入中断请求队列，也就是对其进行注册。
+在IDT表初始化完成之初，每个中断服务队列还为空。此时，即使打开中断且某个外设中断真的发生了，也得不到实际的服务。因为CPU虽然通过中断门进入了某个中断向量的总处理程序，例如IRQ5_interrupt()，但是，具体的中断服务程序（如图形卡的）还没有挂入中断请求队列。因此，在设备驱动程序的初始化阶段，必须通过request_irq()函数将相应的中断服务程序挂入中断请求队列，也就是对其进行注册。
 
 request_irq()函数原型为：
 
 ```c
-int request_irq(unsigned int irq,
+request_irq(unsigned int irq, 
+				irq_handler_t handler, 
+				unsigned long flags,
+				const char *name, 
+void *dev)
 
-   irq_handler_t handler,
-
-   unsigned long irqflags,
-
-   const char *devname,
-
-void *(dev_id)
 ```
 
 第一个参数irq表示要分配的中断号。对某些设备，如传统PC设备上的系统时钟或键盘，这个值通常是预先设定的。而对于大多数其他设备来说，这个值要么是可以通过探测获取，要么可以通过编程动态确定。
 
 第二个参数handler是一个指针，指向处理这个中断的实际中断服务程序。只要操作系统一接收到中断，该函数就被调用。要注意，handler函数的原型是特定的，它接受两个参数，并有一个类型为irqreturn_t的返回值。
 
-第三个参数irqflags可以为0，也可能是IRQF_SAMPLE_RANDOM ，IRQF_SHARED，
+第三个参数flags可以为0，也可能是IRQF_SAMPLE_RANDOM ，IRQF_SHARED，
 
 或IRQF_DISABLED 这几个标志的位掩码。
 
-第四个参数devname是与中断相关的设备的名字。例如，
+第四个参数name是与中断相关的设备的名字。例如，
 PC机上键盘中断对应的这个值为“keyboard”。这些名字会被/proc/irq和/proc/interrupt文件使用，以便与用户通信，稍后我们将对此进行简短讨论。
 
 第五个参数dev_id主要用于共享中断线。当一个中断服务程序需要释放时，dev_id将提供唯一的标志信息，以便从共享中断线的诸多中断服务程序中删除指定的那一个。如果没有这个参数，那么内核不可能知道在给定的中断线上到底要删除哪一个处理程序。如果无需共享中断线，那么将该参数赋为空值（NULL），但是，如果中断线是被共享的，那么就必须传递唯一的信息。
@@ -137,7 +128,7 @@ IRQF_DISABLED|IRQF_SAMPLE_RANDOM, "floppy", NULL);
 
 #### 4 注销中断服务程序
 
-卸载驱动程序时，需要注销相应的中断处理服务程序，并释放中断线。可以调用void free_irq(unsigned int irq,void *dev_id)来释放中断线。
+卸载驱动程序时，需要注销相应的中断处理服务程序，并释放中断线。可以调用free_irq(unsigned int irq,void * dev_id)来释放中断线。
 
 如果指定的中断线不是共享的，那么，该函数删除处理程序的同时将禁用这条中断线。如果中断线是共享的，则仅删除dev_id所对应的服务程序，而这条中断线本身只有在删除了最后一个服务程序时才会被禁用。由此可以看出为什么唯一的dev_id如此重要。对于共享的中断线，需要一个唯一的信息来区分其上面的多个服务程序，并让free_irq()仅仅删除指定的服务程序。不管在哪种情况下（共享或不共享），如果dev_id非空，它都必须与需要删除的服务程序相匹配。
 
@@ -165,28 +156,26 @@ CPU从中断控制器的一个端口取得中断向量I，然后根据I从中断
 
 如5.2.4节所述，一个中断处理程序主要包含两条语句：
 
+```c
 IRQn_interrupt:
-
 pushl $n-256
-
 jmp common_interrupt
+```
 
 其中第一条语句把中断号减256的结果保存在栈中，这是每个中断处理程序唯一的不同之处。然后，所有的中断处理程序都跳到一段相同的代码common_interrupt。这段代码的汇编语言片段为：
-
+```c
 common_interrupt:
-
-SAVE_ALL
-
-call do_IRQ
-
-jmp ret_from_intr
-
+	XCPT_FRAME
+	ASM_CLAC
+	addq $-0x80,(%rsp)		
+	interrupt do_IRQ
+```
 SAVE_ALL宏把中断处理程序会使用的所有CPU寄存器都保存在栈中。然后，调用do_IRQ()函数，因为通过CALL调用这个函数，因此，该函数的返回地址被压入栈。当执行完do_IRQ()，就跳转到ret_from_intr()地址（参见后面的“从中断和异常返回”）。
 
 #### 2. do_IRQ( )函数
 
 do_IRQ()这个函数处理所有外设的中断请求。do_IRQ()对中断请求队列的处理主要是调用
-handle_IRQ_event()函数完成的，handle_IRQ_event （）函数的主要代码片段为：
+handle_IRQ_event()函数完成的，handle_IRQ_event()函数的主要代码片段为：
 
 ```c
 retval=0;
