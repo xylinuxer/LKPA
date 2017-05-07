@@ -87,27 +87,26 @@ unsigned long later = jiffies+5*HZ; /*从现在开始5秒*/
 
 ```c
 struct timespec xtime;
+```
 
 timespec 数据结构定义在文件linux/time.h中，形式如下：
+```c
+   struct timespec { /*高进度*/
+	__kernel_time_t	tv_sec;			/* 秒 */
+	long		tv_nsec;		
+	/* 纳秒：十亿分之一秒（ nanosecond）*/
 
-struct timespec { /* 高精度*/
 
-		long tv_sec; /* 秒 */
-
-		long tv_nsec; /* 纳秒：十亿分之一秒（ nanosecond）*/
-
-   };
+};
 ```
 
 xtime.tv_sec以秒为单位，存放着自1970年7月1日（UTC）以来经过的时间，1970年1月1日被称为纪元，多数Unix系统的墙上时间都是基于该纪元而言的。xtime.tv_nsec记录自上一秒开始经过的纳秒数。除此之外，还有一种普通精度的时间表示方式：
 
 ```c
-struct timeval { /* 普通精度 */
+truct timeval { /* 普通精度 */
 
-		int tv_sec; /* 秒 */
-
-		int tv_usec; /* 微秒：百万分之一秒（microsecond）*/
-
+	__kernel_time_t		tv_sec;		/* 秒 */
+	__kernel_suseconds_t	tv_usec;	/* 微秒：百万分之一秒（microsecond） */
 };
 ```
 
@@ -150,16 +149,11 @@ struct timeval { /* 普通精度 */
 因为上述工作分别都由单独的函数负责完成，所以实际上do_timer()执行代码看起来非常简单。
 
 ```c
-void do_timer(struct pt_regs *regs)
-
+void do_timer(unsigned long ticks)
 {
-
-		jiffies++;
-
-		update_process_times(user_mode(regs));
-
-		update_times();
-
+	jiffies_64 += ticks;
+	update_wall_time();
+	calc_global_load(ticks);
 }
 ```
 
@@ -167,20 +161,18 @@ void do_timer(struct pt_regs *regs)
 
 ```c
 void update_process_times(int user_tick)
-
 {
+	struct task_struct *p = current;
+	int cpu = smp_processor_id();
 
-		struct task_struct *p = current ;
-
-		int cpu = smp_processor_id();
-
-		int system = user_tick;
-
-		update_one_process(p,user_tick,system,cpu);
-
-		run_local_timers();
-
-		scheduler_tick(user_tick,system);
+	account_process_tick(p, user_tick);
+	run_local_timers();
+	rcu_check_callbacks(cpu, user_tick);		
+	
+	...
+	
+	scheduler_tick();
+	run_posix_cpu_timers(p);
 }
 ```
 
@@ -203,30 +195,67 @@ p->stime += system;
 最后
 scheduler_tick()函数负责减少当前运行进程的时间片计数值并且在需要时设置need_resched标志。
 
-当update_process_timer（）函数返回后，do_timer()函数接着会调用update_times()函数更新墙上时钟。
+当update_process_timer（）函数返回后，do_timer()函数接着会调用update_wall_time()函数更新墙上时钟。
 
 ```c
-void update_times(void)
-
+static void update_wall_time(void)
 {
+	struct clocksource *clock;
+	struct timekeeper *real_tk = &timekeeper;
+	struct timekeeper *tk = &shadow_timekeeper;
+	cycle_t offset;
+	int shift = 0, maxshift;
+	unsigned int clock_set = 0;
+	unsigned long flags;
 
-		unsigned long ticks;
+	raw_spin_lock_irqsave(&timekeeper_lock, flags);
 
-		ticks = jiffies - wall_jiffies;
 	
-		if(ticks){
+	if (unlikely(timekeeping_suspended))
+		goto out;
 
-				wall_jiffies + = ticks;
+	clock = real_tk->clock;
 
-				update_wall_time(ticks);
+#ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
+	offset = real_tk->cycle_interval;
+#else
+	offset = (clock->read(clock) - clock->cycle_last) & clock->mask;
+#endif
 
-		}
+	if (offset < real_tk->cycle_interval)
+		goto out;
 
-		last_time_offset = 0;
+	shift = ilog2(offset) - ilog2(tk->cycle_interval);
+	shift = max(0, shift);
+	
+	maxshift = (64 - (ilog2(ntp_tick_length())+1)) - 1;
+	shift = min(shift, maxshift);
+	while (offset >= tk->cycle_interval) {
+		offset = logarithmic_accumulation(tk, offset, shift,
+							&clock_set);
+		if (offset < tk->cycle_interval<<shift)
+			shift--;
+	}
 
-		calc_load(ticks);
+	
+	old_vsyscall_fixup(tk);
+
+	clock_set |= accumulate_nsecs_to_secs(tk);
+
+	write_seqcount_begin(&timekeeper_seq);
+	
+	clock->cycle_last = tk->cycle_last;
+	
+	memcpy(real_tk, tk, sizeof(*tk));
+	timekeeping_update(real_tk, false, false);
+	write_seqcount_end(&timekeeper_seq);
+out:
+	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
+	if (clock_set)
+		clock_was_set_delayed();
 
 }
+
 ```
 
 ticks记录最近一次更新后新产生的节拍数。通常情况下ticks显然应该等于1。但是时钟中断也有可能丢失，因而节拍也会丢失。在中断长时间被禁止的情况下，就会出现这种现象—但这种现象并不正常，往往是个bug。wall_jiffies值随后被加上ticks—所以此刻wall_jiffies值就等于最新的墙上时间的更新值jiffies—接着调用update_wall_time()函数更新xtime，最后由calc_load()计算平均负载，到此，update_times()执行完毕。
@@ -247,17 +276,14 @@ do_timer()函数执行完毕后返回具体的时钟中断处理程序，继续�
 
 ```c
 struct timer_list {
+	
+	struct list_head entry; /*包含定时器的链表*/
+	unsigned long expires; /*以jifffies为单位的定时值*/
+	struct tvec_base *base;/*保护定时器的锁*/
+	void (*function)(unsigned long);/*定时器到时要执行的函数*/
+	unsigned long data; /*传递给处理函数的长整型参数*/
 
-		struct list_head entry; /*包含定时器的链表*/
-
-		unsigned long expires; /*以jifffies为单位的定时值*/
-
-		spinlock_t lock; /*保护定时器的锁*/
-
-		void (*function)(unsigned long); /*定时器到时要执行的函数*/
-
-		unsigned long data; /*传递给处理函数的长整型参数*/
-
+	...
 };
 ```
 
@@ -302,11 +328,9 @@ del_timer(&my_timer);
 内核在时钟中断发生后执行定时器，定时器作为软中断在下半部中执行。具体来说，时钟中断处理程序会执行update_process_timers()函数，该函数随即调用run_local_timers()函数：
 ```c
 void run_local_timers(void)
-
 {
-
-		raise_softirq(TIMER_SOFTIRQ);
-
+	hrtimer_run_queues();
+	raise_softirq(TIMER_SOFTIRQ);
 }
 ```
 run_timer_softirq()函数处理软中断TIMER_SOFTIRQ，其处理函数为run_timer_softirq
@@ -331,35 +355,44 @@ schedule_timeout()函数会让需要延迟执行的进程睡眠到指定的延�
 schedule_timeout( )函数的主要代码如下：
 
 ```c
-unsigned schedule_timeout(unsigned long timeout)
-
+signed long __sched schedule_timeout(signed long timeout)
 {
+	struct timer_list timer;
+	unsigned long expire;
 
-		struct timer_list timer;
+	switch (timeout)
+	{
+	case MAX_SCHEDULE_TIMEOUT:
+		
+		schedule();
+		goto out;
+	default:
+		
+		if (timeout < 0) {
+			printk(KERN_ERR "schedule_timeout: wrong timeout "
+				"value %lx\n", timeout);
+			dump_stack();
+			current->state = TASK_RUNNING;
+			goto out;
+		}
+	}
 
-		unsigned long expire;
+	expire = timeout + jiffies;
 
-		expire = timeout + jiffies;
+	setup_timer_on_stack(&timer, process_timeout, (unsigned long)current);
+	__mod_timer(&timer, expire, false, TIMER_NOT_PINNED);
+	schedule();/* 进程被挂起直到定时器到期 */
+	
+	del_singleshot_timer_sync(&timer);
 
-		init_timer(&timer);
+	destroy_timer_on_stack(&timer);
 
-		timer.expires = expire;
+	timeout = expire - jiffies;
 
-		timer.data = (unsigned long) current;
+ out:
+	return timeout < 0 ? 0 : timeout;
+}
 
-		timer.function = process_timeout;
-
-		add_timer(&timer);
-
-		schedule( ); /* 进程被挂起直到定时器到期 */
-
-		del_timer(&timer);
-
-		timeout = expire - jiffies;
-
-		return (timeout < 0 ? 0 : timeout);
-
-};
 ```
 
 该函数创建一个定时器timer；然后设置它的到期时间expires；设置超时时要执行的函数process_timeout()；然后激活定时器而且调用schedule()。因为进程被标识为TASK_
@@ -368,13 +401,9 @@ INTERRUPTIBLE或TASK_UNINTERRUPTIBLE，所以调度程序不会再选择该进�
 当延时到期时，内核执行下列函数：
 
 ```c
-void process_timeout(unsigned long data)
-
+static void process_timeout(unsigned long __data)
 {
-
-		struct task_struct * p = (struct task_struct *) data;
-
-		wake_up_process(p);
+	wake_up_process((struct task_struct *)__data);
 }
 ```
 

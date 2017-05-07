@@ -175,18 +175,22 @@ SAVE_ALL宏把中断处理程序会使用的所有CPU寄存器都保存在栈中
 #### 2. do_IRQ( )函数
 
 do_IRQ()这个函数处理所有外设的中断请求。do_IRQ()对中断请求队列的处理主要是调用
-handle_IRQ_event()函数完成的，handle_IRQ_event()函数的主要代码片段为：
+handle_irq()函数完成的，handle_irq()函数的主要代码片段为：
 
 ```c
-retval=0;
+bool handle_irq(unsigned irq, struct pt_regs *regs)
+{
+	struct irq_desc *desc;
 
-do {
+	stack_overflow_check(regs);
 
-	   	retval | = action->handler(irq, action->dev_id);
+	desc = irq_to_desc(irq);
+	if (unlikely(!desc))
+		return false;
 
-	   	action = action->next;
-
-} while (action);
+	generic_handle_irq_desc(irq, desc);
+	return true;
+}
 ```
 
 这个循环依次调用请求队列中的每个中断服务程序。这里要说明的是，中断服务程序都在关中断的条件下进行（不包括非屏蔽中断），这也是为什么CPU在穿过中断门时自动关闭中断的原因。但是，关中断时间绝不能太长，否则就可能丢失其它重要的中断。也就是说，中断服务程序应该处理最紧急的事情，而把剩下的事情交给另外一部分来处理，即下半部（bottom half）来处理，这一部分内容将在下一节进行讨论。

@@ -149,20 +149,15 @@ module_exit(test_exit);
    在linux/workqueue.h中定义了work_struct结构：
 
 ```c
-struct work_struct{
-
-		unsigned long pending; /* 这个工作正在等待处理吗？*/
-
-		struct list_head entry; /* 工作的链表 */
-
-		void (*func) (void *); /* 要执行的函数 */
-
-		void *data; /* 传递给函数的参数 */
-
-		void *wq_data; /* 内部使用 */
-
-		struct timer_list timer; /* 延迟的工作队列所用到的定时器 */
-
+struct work_struct {
+	atomic_long_t data; 
+	/*用来记录工作是否已经挂在队列上和用来指向工作者线程*/
+	struct list_head entry;/* 工作的链表 */
+        work_func_t func;
+	/*func的参数是一个work_struct指针，指向的数据就是定义func的work_struct。*/
+#ifdef CONFIG_LOCKDEP
+	struct lockdep_map lockdep_map;/*位图*/
+#endif
 };
 ```
 
@@ -172,13 +167,13 @@ struct work_struct{
 
 要使用工作队列，首先要做的是创建一些需要推后完成的工作。可以通过DECLARE_WORK在编译时静态地建该结构：
 ```c
-   DECLARE_WORK(name, void (*func) (void *), void *data);
+   DECLARE_WORK(n,f)
 ```
-这样就静态地创建一个名为name，待执行函数为func，参数为data的work_struct结构。
+这样就静态地创建一个名为name，待执行函数为func，work_struct结构。
 
 同样，也可以在运行时通过指针创建一个工作：
 ```c
-   INIT_WORK(struct work_struct *work, woid(*func) (void *), void *data);
+   INIT_WORK(_work,_func)
 ```
 这将动态地初始化一个由work指向的工作。
 
@@ -194,13 +189,14 @@ struct work_struct{
 
 现在工作已经被创建，我们可以调度它。想要把给定工作的待处理函数提交给缺省的events工作线程，只需调用
 ```c
-   schedule_work(&work)；
+   schedule_work(struct work_struct *work)
 ```
 work马上就被调度，一旦其所在的处理器上的工作者线程被唤醒，它就被执行。
 
 有时候并不希望工作马上就被执行，而是希望它经过一段延迟以后再执行。在这种情况下，可以调度它在指定的时间执行：
 ```c
-   schedule_delayed_work(&work, delay);
+   schedule_delayed_work(struct delayed_work *dwork,
+					 unsigned long delay)
 ```
 这时，&work指向的work_struct直到delay指定的时钟节拍用完以才会执行。
 
