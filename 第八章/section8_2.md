@@ -282,11 +282,11 @@ struct dentry {
 	struct dentry *d_parent;	/* 父目录的目录项 */
 	struct qstr d_name;          /* 目录项名（可快速查找）*/
 	struct inode *d_inode;		/* 与文件名关联的索引节点 */
-	unsigned char d_iname[DNAME_INLINE_LEN];	/* 短文件名 */
+	unsigned char d_iname[DNAME_INLINE_LEN];    /* 短文件名 */
 	unsigned int d_count;		/* 目录项引用计数器 */
 	spinlock_t d_lock;		
 	const struct dentry_operations *d_op;/* 操作目录项的函数*/
-	struct super_block *d_sb;	/* 目录项树的根 （即文件的超级块)*/
+	struct super_block *d_sb;  /* 目录项树的根（即文件的超级块)*/
 	unsigned long d_time;		
 	void *d_fsdata;			/* 具体文件系统的数据 */
 	struct list_head d_lru;		/*未使用的 LRU 链表 */
@@ -314,12 +314,20 @@ struct dentry {
 &emsp;&emsp;对目录项进行操作的一组函数叫目录项操作表，由dentry\_operation结构描述：
 ```c
 struct dentry_operations {
-        int (*d_revalidate)(struct dentry *, int);
-        int (*d_hash) (struct dentry *, struct qstr *);
-        int (*d_compare) (struct dentry *, struct qstr *, struct qstr *);
-        int (*d_delete)(struct dentry *);
-        void (*d_release)(struct dentry *);
-        void (*d_iput)(struct dentry *, struct inode *);
+      int (*d_revalidate)(struct dentry *, unsigned int);
+	int (*d_weak_revalidate)(struct dentry *, unsigned int);
+	int (*d_hash)(const struct dentry *, const struct inode *,
+			struct qstr *);
+	int (*d_compare)(const struct dentry *, const struct inode *,
+			const struct dentry *, const struct inode *,
+			unsigned int, const char *, const struct qstr *);
+	int (*d_delete)(const struct dentry *);
+	void (*d_release)(struct dentry *);
+	void (*d_prune)(struct dentry *);
+	void (*d_iput)(struct dentry *, struct inode *);
+	char *(*d_dname)(struct dentry *, char *, int);
+	struct vfsmount *(*d_automount)(struct path *);
+	int (*d_manage)(struct dentry *, bool);
 };
 ```
 &emsp;&emsp;该结构中函数的主要功能简述如下：
