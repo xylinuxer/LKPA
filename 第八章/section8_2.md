@@ -160,29 +160,67 @@ int (*sync_fs)(struct super_block *sb, int wait);
 ```c
 struct inode
 {
-        struct list_head i_hash; /*指向哈希链表的指针*/
-        struct list_head i_list; /*指向索引节点链表的指针*/
-        struct list_head i_dentry;/*指向目录项链表的指针*/
-        ...
-        unsigned long i_ino; /*索引节点号*/
-        umode_t i_mode; /*文件的类型与访问权限*/
-        kdev_t i_rdev; /*实际设备标识号*/
-        uid_t i_uid; /* 文件拥有者标识号*/
-        gid_t i_gid /*文件拥有者所在组的标识号*/
-        ...
-        struct inode_operations *i_op; /*指向对该节点进行操作的一组函数*/
-        struct super_block *i_sb; /*指向该文件系统超级块的指针*/
-        atomic_t i_count; /*当前使用该节点的进程数。计数为0，表明该节点可丢弃或被重新使用 */
-        struct file_operations *i_fop; /*指向文件操作的指针*/
-        ...
-        struct vm_area_struct *i_op /*指向对文件进行映射所使用的虚存区指针*/
-        unsigned long i_state; /*索引节点的状态标志*/
-        unsigned int i_flags; /*文件系统的安装标志*/
-        union {/* 联合体结构，其成员指向具体文件系统的inode结构*/
-                struct minix_inode_info minix_i;
-                struct Ext2_inode_info Ext2_i;
-                ...
-        }
+        umode_t			i_mode;  /*文件的类型与访问权限*/
+	unsigned short		i_opflags;
+	kuid_t			i_uid;   /*文件拥有者标识号*/
+	kgid_t			i_gid; /*文件拥有者所在组标识号*/
+	unsigned int		i_flags;  /*文件系统的安装标志*/
+	const struct inode_operations	*i_op;  /*指向对该结点进行操作的一组函数*/
+	struct super_block	*i_sb;  /*指向该文件系统超级块的指针*/
+	struct address_space	*i_mapping;
+	unsigned long		i_ino;   /*索引结点号*/
+	union {
+		const unsigned int i_nlink;
+		unsigned int __i_nlink;
+	};
+	dev_t			i_rdev; //
+	loff_t			i_size;
+	struct timespec		i_atime;
+	struct timespec		i_mtime;
+	struct timespec		i_ctime;
+	spinlock_t		i_lock;	/* i_blocks, i_bytes, maybe i_size */
+	unsigned short          i_bytes;
+	unsigned int		i_blkbits;
+	blkcnt_t		i_blocks;
+	unsigned long		i_state;
+	struct mutex		i_mutex;
+
+	unsigned long		dirtied_when;	/* jiffies of first dirtying */
+
+	struct hlist_node	i_hash;
+	struct list_head	i_wb_list;	/* backing dev IO list */
+	struct list_head	i_lru;		/* inode LRU list */
+	struct list_head	i_sb_list;
+	union {
+		struct hlist_head	i_dentry;
+		struct rcu_head		i_rcu;
+	};
+	u64			i_version;
+	atomic_t		i_count;
+	atomic_t		i_dio_count;
+	atomic_t		i_writecount;
+	const struct file_operations	*i_fop;	/* former ->i_op->default_file_ops */
+	struct file_lock	*i_flock;
+	struct address_space	i_data;
+	struct list_head	i_devices;
+	union {
+		struct pipe_inode_info	*i_pipe;
+		struct block_device	*i_bdev;
+		struct cdev		*i_cdev;
+	};
+
+	__u32			i_generation;
+
+#ifdef CONFIG_FSNOTIFY
+	__u32			i_fsnotify_mask; /* all events this inode cares about */
+	struct hlist_head	i_fsnotify_marks;
+#endif
+
+#ifdef CONFIG_IMA
+	atomic_t		i_readcount; /* struct files open RO */
+#endif
+	void			*i_private; /* fs or device private pointer */
+};
 }
 ```
 
