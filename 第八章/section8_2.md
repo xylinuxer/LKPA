@@ -462,7 +462,7 @@ struct files_struct {
     #include <linux/spinlock.h>
     #include <linux/kdev_t.h>
 
-    static int _init my_init(void)
+    static int __init my_init(void)
     {  
             struct super_block *sb;  
             struct list_head *pos;
@@ -493,7 +493,7 @@ struct files_struct {
     return 0;
     }
 
-    static void _exit my_exit(void)  
+    static void __exit my_exit(void)  
     {  
             printk("unloading…\n");  
     }  
