@@ -314,14 +314,19 @@ file description）。
 ```c
     struct file
     {
-            struct list_head f_list; /*所有打开的文件形成一个链表*/
-            struct dentry *f_dentry; /*与文件相关的目录项对象*/
-            struct vfsmount *f_vfsmnt; /*该文件所在的已安装文件系统*/
-            struct file_operations *f_op; /*指向文件操作表的指针*/
-            mode_t f_mode; /*文件的打开模式*/
-            loff_t f_pos; /*文件的当前位置*/
-            unsigned short f_flags; /*打开文件时所指定的标志*/
-            unsigned short f_count; /*使用该结构的进程数*/
+         	union {
+		struct list_head	fu_list;/*所有打开的文件形成一个链表*/
+		struct rcu_head 	fu_rcuhead;
+	} f_u;
+	struct path		f_path;
+#define f_dentry	f_path.dentry/*与文件相关的目录项对象*/
+	struct inode		*f_inode;	/* cached value */
+	const struct file_operations	*f_op;/*指向文件操作表的指针*/
+	spinlock_t		f_lock;
+	atomic_long_t		f_count;/*使用该结构的进程数*/
+	unsigned int 		f_flags;/*打开文件时所指定的标志*/
+	fmode_t			f_mode;/*文件的打开模式*/
+	loff_t			f_pos;/*文件的当前位置*/
             ...
     };
 ```
@@ -338,14 +343,21 @@ file description）。
 &emsp;&emsp;对文件进行操作的一组函数叫文件操作表，由file\_operations结构描述：
 ```c
 struct file_operations {  
-        loff_t (*llseek) (struct file *, loff_t, int);  
-        ssize_t (*read) (struct file *, char *, size_t, loff_t *);  
-        ssize_t (*write) (struct file *, const char *, size_t, loff_t *);  
-        int (*mmap) (struct file *, struct vm_area_struct *);  
-        int (*open) (struct inode *, struct file *);  
-        int (*flush) (struct file *);  
-        int (*release) (struct inode *, struct file *);
-        int (*fsync) (struct file *, struct dentry *, int datasync);  
+        struct module *owner;
+	loff_t (*llseek) (struct file *, loff_t, int);
+	ssize_t (*read) (struct file *, char __user *, size_t, loff_t *);
+	ssize_t (*write) (struct file *, const char __user *, size_t, loff_t *);
+	ssize_t (*aio_read) (struct kiocb *, const struct iovec *, unsigned long, loff_t);
+	ssize_t (*aio_write) (struct kiocb *, const struct iovec *, unsigned long, loff_t);
+	int (*readdir) (struct file *, void *, filldir_t);
+	unsigned int (*poll) (struct file *, struct poll_table_struct *);
+	long (*unlocked_ioctl) (struct file *, unsigned int, unsigned long);
+	long (*compat_ioctl) (struct file *, unsigned int, unsigned long);
+	int (*mmap) (struct file *, struct vm_area_struct *);
+	int (*open) (struct inode *, struct file *);
+	int (*flush) (struct file *, fl_owner_t id);
+	int (*release) (struct inode *, struct file *);
+	int (*fsync) (struct file *, loff_t, loff_t, int datasync);
         ...  
 };
 ```
@@ -372,21 +384,14 @@ fsync() 文件在缓冲的数据写回磁盘
 &emsp;&emsp;**文件描述符**是用来描述打开的文件的。每个进程用一个files\_struct结构来记录文件描述符的使用情况，这个files\_struct结构称为**用户打开文件表**，它是进程的私有数据。该结构定义如下：
 ```c
 struct files_struct {
-        atomic_t count; /* 共享该表的进程数 */
-        rwlock_t file_lock; /*保护以下的所有域*/
-        int max_fds; /*当前文件对象的最大数*/
-        int max_fdset; /*当前文件描述符的最大数*/
-        int next_fd; /*已分配的文件描述符加1*/
-
-        struct file ** fd; /* 指向文件对象指针数组的指针 */
-
-        fd_set  *close _on _exec; /*指向执行exec( )时需要关闭的文件描述符 */
-        fd_set  *open _fds; /*指向打开文件描述符的指针 */
-        fd _set close _on _exec _init;/* 执行exec( )时需要关闭的文件描述符的初
-        值集合 */
-        fd _set open _fds _init; /*文件描述符的初值集合 */
-
-        struct file  *fd _array[32];/* 文件对象指针的初始化数组 */
+      atomic_t count;/* 共享该表的进程数 */
+	struct fdtable __rcu *fdt;
+	struct fdtable fdtab;
+	spinlock_t file_lock ____cacheline_aligned_in_smp;/*保护以下的所有域*/
+	int next_fd;/*已分配的文件描述符加1*/
+	unsigned long close_on_exec_init[1];/* 执行exec( )时需要关闭的文件描述符的初值集合 */
+	unsigned long open_fds_init[1];/*文件描述符的初值集合 */
+	struct file __rcu * fd_array[NR_OPEN_DEFAULT];/* 文件对象指针的初始化数组 */
 };
 ```
 &emsp;&emsp;fd域指向文件对象的指针数组。该数组的长度存放在max\_fds域中。通常，fd域指向files\_struct结构的fd\_array域，该域包括32个文件对象指针。如果进程打开的文件数目多于32，内核就分配一个新的、更大的文件指针数组，并将其地址存放在fd域中；内核同时也更新max\_fds域的值。
@@ -410,19 +415,21 @@ struct files_struct {
 
 ```c
     struct fs_struct {
-            atomic_t count;
-            rwlock_t lock;
-            int umask;
-            struct dentry * root, * pwd, * altroot;
-            struct vfsmount * rootmnt, * pwdmnt, * altrootmnt;
+           	int users;
+	spinlock_t lock;
+	seqcount_t seq;
+	int umask;
+	int in_exec;
+	struct path root, pwd;
     };
+    
+    struct path {
+	struct vfsmount *mnt;
+	struct dentry *dentry;
+};
 ```
-&emsp;&emsp;count域表示共享同一fs\_struct 表的进程数目。umask域由umask（
-）系统调用使用，用于为新创建的文件设置初始文件许可权。
-
-&emsp;&emsp;fs\_struct中的dentry结构是对一个目录项的描述，root、pwd及
-altroot三个指针都指向这个结构。其中，root所指向的dentry结构代表着本进程所在的根目录，也就是在用户登录进入系统时所看到的根目录；pwd指向进程当前所在的目录；而altroot则是为用户设置的替换根目录。实际运行时，这三个目录不一定都在同一个文件系统中。例如，进程的根目录通常是安装于"/"节点上的Ext2或Ext3文件系统，而当前工作目录可能是安装于/msdos的一个DOS文件系统。因此，fs\_struct结构中的rootmnt、
-pwdmnt及 altrootmnt就是对那三个目录的安装点的描述，安装点的数据结构为vfsmount。
+&emsp;&emsp;umask域由umask（）系统调用使用，用于为新创建的文件设置初始文件许可权。
+&emsp;&emsp;fs\_path中的dentry结构是对一个目录项的描述，root、pwd指针都指向这个结构。其中，root所指向的dentry结构代表着本进程所在的根目录，也就是在用户登录进入系统时所看到的根目录；pwd指向进程当前所在的目录。实际运行时，这两个目录不一定都在同一个文件系统中。例如，进程的根目录通常是安装于"/"节点上的Ext4文件系统，而当前工作目录可能是安装于/msdos的一个DOS文件系统。因此，fs\_path结构中的mnt就是对那两个目录的安装点的描述，安装点的数据结构为vfsmount。
 
 ### 8.2.7主要数据结构间的关系
 
