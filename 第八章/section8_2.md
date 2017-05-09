@@ -169,58 +169,13 @@ struct inode
 	struct super_block	*i_sb;  /*指向该文件系统超级块的指针*/
 	struct address_space	*i_mapping;
 	unsigned long		i_ino;   /*索引结点号*/
-	union {
-		const unsigned int i_nlink;
-		unsigned int __i_nlink;
-	};
-	dev_t			i_rdev; //
-	loff_t			i_size;
-	struct timespec		i_atime;
-	struct timespec		i_mtime;
-	struct timespec		i_ctime;
-	spinlock_t		i_lock;	/* i_blocks, i_bytes, maybe i_size */
-	unsigned short          i_bytes;
-	unsigned int		i_blkbits;
-	blkcnt_t		i_blocks;
-	unsigned long		i_state;
-	struct mutex		i_mutex;
-
-	unsigned long		dirtied_when;	/* jiffies of first dirtying */
-
-	struct hlist_node	i_hash;
-	struct list_head	i_wb_list;	/* backing dev IO list */
-	struct list_head	i_lru;		/* inode LRU list */
-	struct list_head	i_sb_list;
-	union {
-		struct hlist_head	i_dentry;
-		struct rcu_head		i_rcu;
-	};
-	u64			i_version;
-	atomic_t		i_count;
-	atomic_t		i_dio_count;
-	atomic_t		i_writecount;
-	const struct file_operations	*i_fop;	/* former ->i_op->default_file_ops */
-	struct file_lock	*i_flock;
-	struct address_space	i_data;
-	struct list_head	i_devices;
-	union {
-		struct pipe_inode_info	*i_pipe;
-		struct block_device	*i_bdev;
-		struct cdev		*i_cdev;
-	};
-
-	__u32			i_generation;
-
-#ifdef CONFIG_FSNOTIFY
-	__u32			i_fsnotify_mask; /* all events this inode cares about */
-	struct hlist_head	i_fsnotify_marks;
-#endif
-
-#ifdef CONFIG_IMA
-	atomic_t		i_readcount; /* struct files open RO */
-#endif
-	void			*i_private; /* fs or device private pointer */
-};
+	...
+	dev_t			i_rdev; /*实际设备标识号*/
+	...
+	unsigned long		i_state;  /*索引结点的状态标志*/
+        ...
+	struct hlist_node	i_hash;   /*指向哈希链表的指针*/
+        ...
 }
 ```
 
@@ -238,8 +193,8 @@ struct inode
 &emsp;&emsp;与索引节点关联的方法叫**索引节点操作表**，由inode\_operations结构来描述：
 ```c
 struct inode_operations {
+        ...
         int (*create) (struct inode *,struct dentry *,int);
-        struct dentry * (*lookup) (struct inode *,struct dentry *)
         int (*link) (struct dentry *,struct inode *,struct dentry *);
         int (*unlink) (struct inode *,struct dentry *);
         int (*symlink) (struct inode *,struct dentry *,const char *);
@@ -251,8 +206,6 @@ struct inode_operations {
 其中主要函数的功能如下：
 
 create()：创建一个新的磁盘索引节点
-
-lookup():查找一个索引节点所在的目录
 
 link():创建一个新的硬连接
 
