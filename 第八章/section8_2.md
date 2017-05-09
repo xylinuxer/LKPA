@@ -276,23 +276,26 @@ inode结构在磁盘上就有对应的映像。所以说，一个索引节点对
 &emsp;&emsp;dentry 结构的主要域为：
 ```c
 struct dentry {
-        atomic_t d_count; /* 目录项引用计数器 */
-        unsigned int d_flags; /* 目录项标志 */
-        struct inode * d_inode; /* 与文件名关联的索引节点 */
-        struct dentry * d_parent; /* 父目录的目录项 */
-        struct list_head d_hash; /* 目录项形成的哈希表 */
-        struct list_head d_lru; /*未使用的 LRU 链表 */
-        struct list_head d_child; /*父目录的子目录项所形成的链表 */
-        struct list_head d_subdirs; /* 该目录项的子目录所形成的链表*/
-        struct list_head d_alias; /* 索引节点别名的链表*/
-        int d_mounted; /* 目录项的安装点 */
-        struct qstr d_name; /* 目录项名（可快速查找）*/
-        struct dentry_operations *d_op; /* 操作目录项的函数*/
-        struct super_block * d_sb; /* 目录项树的根 （即文件的超级块*/
-        unsigned long d_vfs_flags;
-        void * d_fsdata; /* 具体文件系统的数据 */
-        unsigned char d_iname[DNAME_INLINE_LEN]; /* 短文件名 */
-        ...
+	unsigned int d_flags;		/* 目录项标志 */
+	seqcount_t d_seq;		
+	struct hlist_bl_node d_hash;	/* 目录项形成的哈希表 */
+	struct dentry *d_parent;	/* 父目录的目录项 */
+	struct qstr d_name;          /* 目录项名（可快速查找）*/
+	struct inode *d_inode;		/* 与文件名关联的索引节点 */
+	unsigned char d_iname[DNAME_INLINE_LEN];	/* 短文件名 */
+	unsigned int d_count;		/* 目录项引用计数器 */
+	spinlock_t d_lock;		
+	const struct dentry_operations *d_op;/* 操作目录项的函数*/
+	struct super_block *d_sb;	/* 目录项树的根 （即文件的超级块)*/
+	unsigned long d_time;		
+	void *d_fsdata;			/* 具体文件系统的数据 */
+	struct list_head d_lru;		/*未使用的 LRU 链表 */
+	union {
+		struct list_head d_child;	/*父目录的子目录项所形成的链表 */
+	 	struct rcu_head d_rcu;
+	} d_u;
+	struct list_head d_subdirs;	/* 该目录项的子目录所形成的链表*/
+	struct hlist_node d_alias;	/* 索引节点别名的链表*/
 };
 ```
 &emsp;&emsp;一个有效的dentry结构必定有一个inode结构，这是因为一个目录项要么代表着一个文件，要么代表着一个目录，而目录实际上也是文件。所以，只要dentry结构是有效的，则其指针d\_inode必定指向一个inode结构。可是，反过来则不然，一个inode却可能对应着不止一个dentry结构；也就是说，一个文件可以有不止一个文件名或路径名。这是因为一个已经建立的文件可以被链接（link）到其他文件名。所以在inode结构中有一个队列i\_dentry,凡是代表着同一个文件的所有目录项都通过其dentry结构中的d\_alias域挂入相应inode结构中的i\_dentry队列。
