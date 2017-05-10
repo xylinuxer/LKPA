@@ -1,24 +1,24 @@
-## **2．6 Linux系统地址映射举例**
+## **2.6 Linux系统地址映射举例**
 
 &emsp;&emsp;Linux采用分页存储管理。虚拟地址空间划分成固定大小的“页”，由MMU在运行时将虚拟地址映射（变换）成某个物理页面中的地址。从80X86系列的历史演变过程可知，分段管理在分页管理之前出现，因此，80X86的MMU对程序中的虚拟地址先进行段式映射（虚拟地址转换为线性地址），然后才能进行页式映射（线性地址转换为物理地址）。既然硬件结构是这样设计的，Linux内核在设计时只好服从这种选择，只不过，Linux巧妙地使段式映射实际上不起什么作用。
 
 &emsp;&emsp;本节通过一个程序的执行来说明地址的映射过程。
 
-  &emsp;假定我们有一个简单的C程序Hello.c
+&emsp;&emsp;假定我们有一个简单的C程序Hello.c
 
-     # include <stdio.h>
+     #include <stdio.h>
      greeting ( )
      {
-		   printf(“Hello,world!\n”);
+	printf(“Hello,world!\n”);
      }
      main()
-      {
-            greeting();
-      }
+     {
+        greeting();
+     }
 
 &emsp;&emsp;之所以把这样简单的程序写成两个函数，是为了说明指令的转移过程。我们用gcc和ld对其进行编译和连接，得到可执行代码hello。然后，用Linux的实用程序objdump对其进行反汇编：
 
-    % objdump –d hello
+     % objdump –d hello
 
 &emsp;&emsp;得到的主要片段为：
 

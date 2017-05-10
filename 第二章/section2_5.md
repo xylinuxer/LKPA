@@ -14,7 +14,7 @@
 
 &emsp;&emsp;在Intel的语法中，寄存器和和立即数都没有前缀。但是在AT&T中，寄存器前冠以“％”，而立即数前冠以“$”。在Intel的语法中，十六进制和二进制立即数后缀分别冠以“h”和“b”，而在AT&T中，十六进制立即数前冠以“0x”，表2.2给出几个相应的例子。
 
-&emsp;表2.1 Intel与AT&T前缀的区别
+&emsp;&emsp;表2.1 Intel与AT&T前缀的区别
 
 |Intel语法|	AT&T语法|
 |-----|-----|
@@ -26,9 +26,9 @@
 
 &emsp;&emsp;Intel与AT&T操作数的方向正好相反。在Intel语法中，第一个操作数是目的操作数，第二个操作数源操作数。而在AT&T中，第一个数是源操作数，第二个数是目的操作数。由此可以看出，AT&T 的语法符合人们通常的阅读习惯。
 
-例如：在Intel中， `mov	eax,[ecx]`
+&emsp;&emsp;例如：在Intel中，`mov	eax,[ecx]`
 
-   在AT&T中，   `movl	(%ecx),%eax`
+&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;在AT&T中，`movl	(%ecx),%eax`
 
 **3．内存单元操作数**
 
@@ -36,7 +36,7 @@
     
 &emsp;&emsp;例如： 在Intel中，`mov	eax,[ebx+5]`
 
-   在AT&T，`movl	5(%ebx),%eax`
+&emsp;&emsp;&emsp;&emsp;&emsp;在AT&T，`movl	5(%ebx),%eax`
 
 **4．操作码的后缀**
 
@@ -55,7 +55,7 @@
 
 &emsp;&emsp;在Linux源代码中，以.S为扩展名的文件是“纯”汇编语言的文件。这里，我们结合具体的例子再介绍一些AT&T汇编语言的相关知识。
 
-   **1．GNU汇编程序GAS（GNU ASsembly和连接程序**
+**1．GNU汇编程序GAS（GNU ASsembly和连接程序**
 
 &emsp;&emsp;当你编写了一个程序后，就需要对其进行汇编（assembly）和连接。在Linux下有两种方式，一种是使用汇编程序GAS和连接程序ld，一种是使用gcc。我们先来看一下GAS和ld:
 
@@ -79,13 +79,13 @@
 
 &emsp;&emsp;.section .data： 这种节包含程序已初始化的数据，也就是说，包含具有初值的那些变量，例如：
 
-              hello     : .string "Hello world!\n"
-              hello_len : .long 13
+    hello : .string "Hello world!\n"
+    hello_len : .long 13
 
 &emsp;&emsp;.section .bss：这个节包含程序还未初始化的数据，也就是说，包含没有初值的那些变量。当操作系统装入这个程序时将把这些变量都置为0，例如：
 
-      name      : .fill 30   # 用来请求用户输入名字
-              name_len  : .long  0   # 名字的长度 (尚未定义)
+    name : .fill 30   # 用来请求用户输入名字
+    name_len : .long  0   # 名字的长度 (尚未定义)
 &emsp;&emsp;当这个程序被装入时，name 和 name_len都被置为0。如果你在.bss节不小心给一个变量赋了初值，这个值也会丢失，并且变量的值仍为0。
 
 &emsp;&emsp;使用.bss比使用.data的优势在于，.bss节不占用磁盘的空间。在磁盘上，一个长整数就足以存放.bss节。当程序被装入到内存时，操作系统也只分配给这个节4个字节的内存大小。
@@ -98,15 +98,19 @@
 
 ### **2.5.3 Gcc嵌入式汇编**
 
-&emsp;&emsp;在Linux的源代码中，有很多C语言的函数中嵌入一段汇编语言程序段，这就是gcc提供的“asm”功能，例如内核代码中，读控制寄存器CR0的一个宏read_cr0()：
- 
-    #define read_cr0() ({ \
-         unsigned int __dummy; \
-         __asm__( \
-                 "movl %%cr0,%0\n\t" \
-                 :"=r" (__dummy)); \
-         __dummy; \
-     })
+&emsp;&emsp;在Linux的源代码中，有很多C语言的函数中嵌入一段汇编语言程序段，这就是gcc提供的“asm”功能，例如内核代码中，读控制寄存器CR0的一个功能函数read_cr0()以及其中的调用函数native_read_cr0()：
+
+    static inline unsigned long read_cr0(void)
+    {
+        return native_read_cr0();
+    }
+
+    static inline unsigned long native_read_cr0(void)
+    {
+        unsigned long val;
+        asm volatile("mov %%cr0,%0\n\t" : "=r" (val), "=m" (__force_order));
+        return val;
+    }
  
 &emsp;&emsp;这种形式看起来比较陌生，因为这不是标准C所定义的形式，而是gcc 对C语言的扩充。其中__dummy为C函数所定义的变量；关键词__asm__表示汇编代码的开始。括弧中第一个引号中为汇编指令movl，紧接着有一个冒号，这种形式阅读起来比较复杂。
 
@@ -117,17 +121,17 @@
     __asm__ __volatile__ ("<asm routine>" : output : input : modify);
  
 &emsp;&emsp;其中，__asm__表示汇编代码的开始，其后可以跟__volatile__（这是可选项），其含义是避免“asm”指令被删除、移动或组合；然后就是小括弧，括弧中的内容是我们介绍的重点：
-·      "<asm routine>"为汇编指令部分，例如，"movl %%cr0,%0\n\t"。数字前加前缀“％“，如％1，％2等表示使用寄存器的样板操作数。可以使用的操作数总数取决于具体CPU中通用寄存器的数量，如Intel可以有8个。指令中有几个操作数，就说明有几个变量需要与寄存器结合，由gcc在编译时根据后面输出部分和输入部分的约束条件进行相应的处理。由于这些样板操作数的前缀使用了”％“，因此，在用到具体的寄存器时就在前面加两个“％”，如%%cr0。
+&emsp;&emsp;·"<asm routine>"为汇编指令部分，例如，"movl %%cr0,%0\n\t"。数字前加前缀“％“，如％1，％2等表示使用寄存器的样板操作数。可以使用的操作数总数取决于具体CPU中通用寄存器的数量，如Intel可以有8个。指令中有几个操作数，就说明有几个变量需要与寄存器结合，由gcc在编译时根据后面输出部分和输入部分的约束条件进行相应的处理。由于这些样板操作数的前缀使用了”％“，因此，在用到具体的寄存器时就在前面加两个“％”，如%%cr0。
 
-·      输出部分（output），用以规定对输出变量（目标操作数）如何与寄存器结合的约束（constraint）,输出部分可以有多个约束，互相以逗号分开。每个约束以“＝”开头，接着用一个字母来表示操作数的类型，然后是关于变量结合的约束。例如，上例中：
+&emsp;&emsp;·输出部分（output），用以规定对输出变量（目标操作数）如何与寄存器结合的约束（constraint）,输出部分可以有多个约束，互相以逗号分开。每个约束以“＝”开头，接着用一个字母来表示操作数的类型，然后是关于变量结合的约束。例如，上例中：
 
-:"=r" (__dummy)
+&emsp;&emsp;:"=r" (__dummy)
 
-“＝r”表示相应的目标操作数（指令部分的%0）可以使用任何一个通用寄存器，并且变量__dummy 存放在这个寄存器中，但如果是：
+&emsp;&emsp;“＝r”表示相应的目标操作数（指令部分的%0）可以使用任何一个通用寄存器，并且变量__dummy 存放在这个寄存器中，但如果是：
 
-：“＝m”（__dummy）
+&emsp;&emsp;：“＝m”（__dummy）
 
-“＝m”就表示相应的目标操作数是存放在内存单元__dummy中。
+&emsp;&emsp;“＝m”就表示相应的目标操作数是存放在内存单元__dummy中。
 
 &emsp;&emsp;表示约束条件的字母很多，表 2.3 给出几个主要的约束字母及其含义：
 
@@ -148,87 +152,108 @@
 
 
 -     输入部分（Input）：输入部分与输出部分相似，但没有“＝”。如果输入部分一个操作数所要求使用的寄存器，与前面输出部分某个约束所要求的是同一个寄存器，那就把对应操作数的编号（如“1”，“2”等）放在约束条件中，在后面的例子中，我们会看到这种情况。
--       修改部分（modify）:这部分常常以“memory”为约束条件，以表示操作完成后内存中的内容已有改变，如果原来某个寄存器的内容来自内存，那么现在内存中这个单元的内容已经改变。
+-     修改部分（modify）:这部分常常以“memory”为约束条件，以表示操作完成后内存中的内容已有改变，如果原来某个寄存器的内容来自内存，那么现在内存中这个单元的内容已经改变。
  
-&emsp;&emsp;注意，指令部分为必选项，而输入部分、输出部分及修改部分为可选项，当输入部分存在，而输出部分不存在时，分号“：“要保留，当“memory”存在时，三个分号都要保留，例如system.h中的宏定义__cli()：
+&emsp;&emsp;注意，指令部分为必选项，而输入部分、输出部分及修改部分为可选项，当输入部分存在，而输出部分不存在时，分号“：“要保留，当“memory”存在时，三个分号都要保留，例如函数static inline void native_irq_disable()：
 
-       #define __cli()                 __asm__ __volatile__("cli": : :"memory")
+    static inline void native_irq_disable(void)
+    {
+        asm volatile("cli": : :"memory");
+    }
 
 **2.  Linux源代码中嵌入式汇编举例**
 
-   Linux源代码中，在arch目录下的.h和.c文件中，很多文件都涉及嵌入式汇编，下面以system.h中的C函数为例，说明嵌入式汇编的应用。
+&emsp;&emsp;Linux源代码中，在arch目录下的.h和.c文件中，很多文件都涉及嵌入式汇编，下面以/arch/x86/include/asm/irqflags.h中的C函数为例，说明嵌入式汇编的应用。
 
-（1）简单应用
+&emsp;&emsp;（1）简单应用
 
-     #define __save_flags(x)         __asm__ __volatile__("pushfl ; popl %0":"=g" (x): /* no input */)
-     #define __restore_flags(x)      __asm__ __volatile__("pushl %0 ; popfl": /* no output */
-      :"g" (x):"memory", "cc")
+     static inline unsigned long native_save_fl(void)
+     {
+        unsigned long flags;
+
+        /*
+         * "=rm" is safe here, because "pop" adjusts the stack before
+         * it evaluates its effective address -- this is part of the
+         */
+        asm volatile("# __raw_save_flags\n\t"
+                     "pushf ; pop %0"
+                     : "=rm" (flags)
+                     : /* no input */
+                     : "memory");
+
+        return flags;
+    }
+    
+    static inline void native_restore_fl(unsigned long flags)
+    {
+        asm volatile("push %0 ; popf"
+                     : /* no output */
+                     :"g" (flags)
+                     :"memory", "cc");
+    }
 
 &emsp;&emsp;第一个宏是保存标志寄存器的值，第二个宏是恢复标志寄存器的值。第一个宏中的pushfl指令是把标志寄存器的值压栈。而popl是把栈顶的值（刚压入栈的flags）弹出到x变量中，这个变量可以存放在一个寄存器或内存中。这样，你可以很容易地读懂第二个宏。
 
-(2) 较复杂应用
+&emsp;&emsp;(2) 较复杂应用
 
-     static inline unsigned long get_limit(unsigned long segment)
-     {
-         unsigned long __limit;
-         __asm__("lsll %1,%0"
-                 :"=r" (__limit):"r" (segment));
-        return __limit+1;
-     }
-
+    static inline unsigned long get_limit(unsigned long segment)
+    {
+        unsigned long __limit;
+        asm("lsll %1,%0" : "=r" (__limit) : "r" (segment));
+        return __limit + 1;
+    }
+    
 &emsp;&emsp;这是一个设置段界限的函数，汇编代码段中的输出参数为__limit（即%0），输入参数为segment（即%1）。lsll是加载段界限的指令，即把segment段描述符中的段界限字段装入某个寄存器（这个寄存器与__limit结合），函数返回__limit加1，即段长。
 
-（3）复杂应用
+&emsp;&emsp;（3）复杂应用
 
-&emsp;&emsp;在Linux内核代码中，有关字符串操作的函数都是通过嵌入式汇编完成的，因为内核及用户程序对字符串函数的调用非常频繁，因此，用汇编代码实现主要是为了提高效率（当然是以牺牲可读性和可维护性为代价的）。在此，我们仅列举一个字符串比较函数strcmp，其代码在arch/i386／string.h中。
+&emsp;&emsp;在Linux内核代码中，有关字符串操作的函数都是通过嵌入式汇编完成的，因为内核及用户程序对字符串函数的调用非常频繁，因此，用汇编代码实现主要是为了提高效率（当然是以牺牲可读性和可维护性为代价的）。在此，我们仅列举一个字符串比较函数strcmp，其代码在/arch/x86/lib/string_32.c中。
 
-     static inline int strcmp(const char * cs,const char * ct)
-     {
-     int d0, d1;
-     register int __res;
-     __asm__ __volatile__(
-         "1:\tlodsb\n\t"
-         "scasb\n\t"
-         "jne 2f\n\t"
-         "testb %%al,%%al\n\t"
-         "jne 1b\n\t"
-         "xorl %%eax,%%eax\n\t"
-         "jmp 3f\n"
-         "2:\tsbbl %%eax,%%eax\n\t"
-         "orb $1,%%al\n"
-         "3:"
-         :"=a" (__res), "=&S" (d0), "=&D" (d1)
-                      :"1" (cs),"2" (ct));
-     return __res;
-     }
+    int strcmp(const char *cs, const char *ct)
+    {
+        int d0, d1;
+        int res;
+        asm volatile("1:\tlodsb\n\t"
+                "scasb\n\t"
+                "jne 2f\n\t"
+                "testb %%al,%%al\n\t"
+                "jne 1b\n\t"
+                "xorl %%eax,%%eax\n\t"
+                "jmp 3f\n"
+                "2:\tsbbl %%eax,%%eax\n\t"
+                "orb $1,%%al\n"
+                "3:"
+                : "=a" (res), "=&S" (d0), "=&D" (d1)
+                : "1" (cs), "2" (ct)
+                : "memory");
+        return res;
+    }
 
 &emsp;&emsp;其中的“\n”是换行符，“\t”是tab符，在每条命令的结束加这两个符号，是为了让gcc把嵌入式汇编代码翻译成一般的汇编代码时能够保证换行和留有一定的空格。例如，上面的嵌入式汇编会被翻译成：
 
-**1：**
+&emsp;&emsp;**1：**
 
-**lodsb**        //装入串操作数,即从[esi]传送到al寄存器，然后esi指向串中下一个元素
+    **lodsb**           //装入串操作数,即从[esi]传送到al寄存器，然后esi指向串中下一个元素
 
-   **scasb**        //扫描串操作数，即从al中减去es:[edi]，不保留结果，只改变标志
+    **scasb**           //扫描串操作数，即从al中减去es:[edi]，不保留结果，只改变标志
 
-   **jne2f**          //如果两个字符不相等，则转到标号2 
+    **jne2f**           //如果两个字符不相等，则转到标号2 
   
-   **testb %al  %al**  
+    **testb %al  %al**  
 
-   **jne 1b**
+    **jne 1b**
 
-   **xorl %eax %eax**
+    **xorl %eax %eax**
 
-   **jmp 3f**
+    **jmp 3f**
 
-**2:**
+&emsp;&emsp;**2: **
 
- **sbbl %eax %eax**
+    **sbbl %eax %eax**
 
- **3**
+    **3**
 
- **orb $1 %al**
-
-
+    **orb $1 %al**
 
 &emsp;&emsp;这段代码看起来非常熟悉，读起来也不困难。其中1f 表示往前（forword）找到第一个标号为1的那一行，相应地，1b表示往后找。其中嵌入式汇编代码中输出和输入部分的结合情况为：
 
@@ -238,5 +263,5 @@
 -     局部变量d0，与％1相结合，也与输入部分的cs参数相对应，也存放在寄存器ESI中，即ESI中存放源字符串的起始地址。
 -     局部变量d1， 与％2相结合，也与输入部分的ct参数相对应，也存放在寄存器EDI中，即EDI中存放目的字符串的起始地址。
 
-&emsp;通过对这段代码的分析我们应当体会到，万变不利其本，嵌入式汇编与一般汇编的区别仅仅是形式，本质依然不变。
+&emsp;&emsp;通过对这段代码的分析我们应当体会到，万变不利其本，嵌入式汇编与一般汇编的区别仅仅是形式，本质依然不变。
 
