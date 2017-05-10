@@ -118,15 +118,10 @@ Linux的伙伴算法把所有的空闲页面分为10个块链表，每个链表�
 伙伴系统所采用的数据结构是一个叫做 free_area 的数组，其示意图如图4.11所示。
 
 ```c
-struct free_area_struct {
-
-		struct page *next;
-
-		struct page *prev;
-
-		unsigned int * map;
-
-} free_area[10]
+struct free_area {
+	struct list_head	free_list[MIGRATE_TYPES];
+	unsigned long		nr_free;
+};
 ```
 <div style="text-align: center">
 <img src="4_11.png"/>
@@ -134,9 +129,7 @@ struct free_area_struct {
 
 <center>图4.11 伙伴系统使用的数据结构</center>
 
-数组free_area的每项包含三个域：next、prev和map。指针next、prev
-用于将物理页面结构struct page
-连结成一个双向链表，其中的数字表示内存块的起始页面号，例如，图4.11中大小为4的页块有两块，一块从第4页开始，一块从56页开始。nr_free表示2k个空闲页块的个数，例如上图中大小为1（20）的页块有1个，为4的页块有两个。其中的map域指向一个位图。
+在这个结构中有一个表示当前分配阶所对应的页框块链表free_list，不过这里稍显复杂一下，因free_list是一个链表数组，这个数组也称为迁移数组。我们可以将这个数组看作是对页框块链表的进一步细分，每个数组元素对应一种迁移类型的页框块链表。除了链表结构以外，该结构使用nr_free表示当前链表中空闲页框块的数目，比如free_area[2]中nr_free的值为5，表示有5个大小为4的页框块，那么总的页框数目为20。
 
 我们通过一个简单的例子来说明该算法的工作原理。
 
@@ -158,108 +151,368 @@ Linux使用伙伴算法有效地分配和回收物理页块。该算法试图分
 
 函数__get_free_pages 用于物理页块的分配，其定义如下：
 ```c
-unsigned long __get_free_pages(int gfp_mask, unsigned long order)
+unsigned long __get_free_pages(gfp_t gfp_mask, unsigned int order)
 ```
-其中gfp_mask是分配标志，表示对所分配内存的特殊要求。常用的标志为GFP_KERNEL和GFP_ATOMIC，前者表示在分配内存期间可以睡眠，在进程中使用；后者表示不可以睡眠。在中断处理程序中使用。
+其中gfp是分配标志，表示对所分配内存的特殊要求。常用的标志为GFP_KERNEL和GFP_ATOMIC，前者表示在分配内存期间可以睡眠，在进程中使用；后者表示不可以睡眠。在中断处理程序中使用。
 
 Order是指数，所请求的页块大小为2的order次幂个物理页面，即页块在free_area数组中的索引。
 
-该函数所做的工作如下：
-
-#### 1. 检查所请求的页块大小是否能够被满足：
-
+该函数会去调用alloc_pages_current()，下面我们就来分析alloc_pages_current()
 ```c
-if (order >= 10)
+struct page *alloc_pages_current(gfp_t gfp, unsigned order)
+{
+	struct mempolicy *pol = get_task_policy(current);
+	struct page *page;
+	unsigned int cpuset_mems_cookie;
 
-		goto nopage; /* 说明free_area数组中没有这么大的块*/
+	if (!pol || in_interrupt() || (gfp & __GFP_THISNODE))
+		pol = &default_policy;
+
+retry_cpuset:
+	cpuset_mems_cookie = get_mems_allowed();
+
+	if (pol->mode == MPOL_INTERLEAVE)
+		page = alloc_page_interleave(gfp, order, interleave_nodes(pol));
+	else
+		page = __alloc_pages_nodemask(gfp, order,
+				policy_zonelist(gfp, pol, numa_node_id()),
+				policy_nodemask(gfp, pol));
+
+	if (unlikely(!put_mems_allowed(cpuset_mems_cookie) && !page))
+		goto retry_cpuset;
+
+	return page;
+}
 ```
-
-#### 2. 检查系统中空闲物理页的总数是否已低于允许的下界：
-
+函数的开始会去检查标志位，如内存分配标志位为置有__GFP_THISNODE,明确在当前节点上申请内存，或代码申请是在中断中，或当前进程的内存分配策略为空时；就是使用系统默认的分配策略。默认的分配策略为MPOL_PREFERRED
 ```c
-if (nr_free_pages > freepages.min) {
+static struct mempolicy default_policy = {
+	.refcnt = ATOMIC_INIT(1), 
+	.mode = MPOL_PREFERRED,
+	.flags = MPOL_F_LOCAL,
+};
+```
+若内核打开了cpuset功能，则get_mems_allowed()和put_mems_allowed()两个函数功能就是增加和减少当前进程mems_allowed_seq的计数。若内核关闭了cpuset功能，则该两个函数实现为空。mems_allowed_seq的计数目的就是在内存分配过程中，避免上层更改内存分配策略。
 
-		if (!low_on_memory)
+下面我们来分析__alloc_pages_nodemask()函数
+```c
+struct page *
+__alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
+			struct zonelist *zonelist, nodemask_t *nodemask)
+{
+	enum zone_type high_zoneidx = gfp_zone(gfp_mask);
+	struct zone *preferred_zone;
+	struct page *page = NULL;
+	int migratetype = allocflags_to_migratetype(gfp_mask);
+	unsigned int cpuset_mems_cookie;
+	int alloc_flags = ALLOC_WMARK_LOW|ALLOC_CPUSET;
+	struct mem_cgroup *memcg = NULL;
 
-				goto ok_to_allocate;
+	gfp_mask &= gfp_allowed_mask;
 
-		if (nr_free_pages >= freepages.high) {
+	lockdep_trace_alloc(gfp_mask);
 
-				low_on_memory = 0;
+	might_sleep_if(gfp_mask & __GFP_WAIT);
 
-				goto ok_to_allocate;
+	if (should_fail_alloc_page(gfp_mask, order))
+		return NULL;
 
+
+	if (unlikely(!zonelist->_zonerefs->zone))
+		return NULL;
+
+
+	if (!memcg_kmem_newpage_charge(gfp_mask, &memcg, order))
+		return NULL;
+
+retry_cpuset:
+	cpuset_mems_cookie = get_mems_allowed();
+
+	first_zones_zonelist(zonelist, high_zoneidx,
+				nodemask ? : &cpuset_current_mems_allowed,
+				&preferred_zone);
+	if (!preferred_zone)
+		goto out;
+
+#ifdef CONFIG_CMA
+	if (allocflags_to_migratetype(gfp_mask) == MIGRATE_MOVABLE)
+		alloc_flags |= ALLOC_CMA;
+#endif
+	page = get_page_from_freelist(gfp_mask|__GFP_HARDWALL, nodemask, order,
+			zonelist, high_zoneidx, alloc_flags,
+			preferred_zone, migratetype);
+	if (unlikely(!page)) {
+	
+		gfp_mask = memalloc_noio_flags(gfp_mask);
+		page = __alloc_pages_slowpath(gfp_mask, order,
+				zonelist, high_zoneidx, nodemask,
+				preferred_zone, migratetype);
+	}
+
+	trace_mm_page_alloc(page, order, gfp_mask, migratetype);
+
+out:
+	
+	if (unlikely(!put_mems_allowed(cpuset_mems_cookie) && !page))
+		goto retry_cpuset;
+
+	memcg_kmem_commit_charge(page, memcg, order);
+
+	return page;
+}
+```
+函数的前一部分代码都是在做一些检查工作，检查通过之后，就尝试通get_page_from_freelist()来从区域列表中分配2^order个物理地址连续的页面。即首先尝试在控线页面链表中分配页面。显然随着系统的运行，空闲页面会越来越少，通过get_page_from_freelist()分配内存很可能失败，此时就要调用__alloc_pages_slowpath()函数全局内存池中分配页面，其中的工作也包括物理页面的回收。
+下面我们来分析get_page_from_freelist()，因为__alloc_pages_slowpath()函数主要是解决在内存不足时如何分配内存的问题。这里我们就不再详细分析。
+
+#### get_page_from_freelist()分析
+get_page_from_freelist()的函数主体就是for_each_zone_zonelist_nodemask()循环语句，在nodemask确定的节点中所有区域，找到满足请求数量的空闲页面。
+```c
+
+static struct page *
+get_page_from_freelist(gfp_t gfp_mask, nodemask_t *nodemask, unsigned int order,
+		struct zonelist *zonelist, int high_zoneidx, int alloc_flags,
+		struct zone *preferred_zone, int migratetype)
+{
+	...
+
+	for_each_zone_zonelist_nodemask(zone, z, zonelist,
+						high_zoneidx, nodemask) {
+		if (IS_ENABLED(CONFIG_NUMA) && zlc_active &&
+			!zlc_zone_worth_trying(zonelist, z, allowednodes))
+				continue;
+		if ((alloc_flags & ALLOC_CPUSET) &&
+			!cpuset_zone_allowed_softwall(zone, gfp_mask))
+				continue;
+	
+		if ((alloc_flags & ALLOC_WMARK_LOW) &&
+		    (gfp_mask & __GFP_WRITE) && !zone_dirty_ok(zone))
+			goto this_zone_full;
+
+		BUILD_BUG_ON(ALLOC_NO_WATERMARKS < NR_WMARK);
+		if (!(alloc_flags & ALLOC_NO_WATERMARKS)) {
+			unsigned long mark;
+			int ret;
+
+			mark = zone->watermark[alloc_flags & ALLOC_WMARK_MASK];
+			if (zone_watermark_ok(zone, order, mark,
+				    classzone_idx, alloc_flags))
+				goto try_this_zone;
+
+			if (IS_ENABLED(CONFIG_NUMA) &&
+					!did_zlc_setup && nr_online_nodes > 1) {
+			
+				allowednodes = zlc_setup(zonelist, alloc_flags);
+				zlc_active = 1;
+				did_zlc_setup = 1;
+			}
+
+			if (zone_reclaim_mode == 0 ||
+			    !zone_allows_reclaim(preferred_zone, zone))
+				goto this_zone_full;
+
+			if (IS_ENABLED(CONFIG_NUMA) && zlc_active &&
+				!zlc_zone_worth_trying(zonelist, z, allowednodes))
+				continue;
+
+			ret = zone_reclaim(zone, gfp_mask, order);
+			switch (ret) {
+			case ZONE_RECLAIM_NOSCAN:
+
+				continue;
+			case ZONE_RECLAIM_FULL:
+
+				continue;
+			default:
+
+				if (zone_watermark_ok(zone, order, mark,
+						classzone_idx, alloc_flags))
+					goto try_this_zone;
+				if (((alloc_flags & ALLOC_WMARK_MASK) == ALLOC_WMARK_MIN) ||
+				    ret == ZONE_RECLAIM_SOME)
+					goto this_zone_full;
+
+				continue;
+			}
 		}
 
+try_this_zone:
+		page = buffered_rmqueue(preferred_zone, zone, order,
+						gfp_mask, migratetype);
+		if (page)
+			break;
+this_zone_full:
+		if (IS_ENABLED(CONFIG_NUMA))
+			zlc_mark_zone_full(zonelist, z);
+	}
+
+	...
+}
+```
+在真正查找空闲页面之前，先做一些基本检查。若内核打开了NUMA，就通过zlc_zone_worth_trying()函数来快速检查该区域是否值得去更进一步查找空闲内存；多该区域不值得查找，则到下一个区域执行同样的动作。
+接下来检查区域水准，看当前区域是否满足水准要求。
+
+(1) 若本区域水准满足要求，则直接尝试在本区域分配页面。
+
+(2) 若本区域水准不能满足要求，且区域zone_reclaim_mode的值为0，则跳转到this_zone_full；
+
+(3) 如果上面两个条件都不满足，则要通过调用zone_reclaim()尝试回收本区域内存。若返回值为区域未扫描ZONE_RECLAIM_NOSCAN，则跳过这个区域尝试下一个区域；若返回值为ZONE_RECLAIM_FULL没法回收，就标记该区域已满，下次就不会浪费时间在扫描这个区域；若成功回收了部分内存，则重新检查区域水准。
+
+当我们检查完当前区域并且认为这个区域能够有足够的控线页面满足要求。就回去调用buffered_rmqueue()函数进行区域分配页面。
+
+```c
+static inline
+struct page *buffered_rmqueue(struct zone *preferred_zone,
+			struct zone *zone, int order, gfp_t gfp_flags,
+			int migratetype)
+{
+	...
+page = __rmqueue(zone, order, migratetype);
+
+	...
 }
 ```
 
-因为物理内存是十分紧俏的系统资源，很容易被用完。而一旦内存被用完，当出现特殊情况时系统将无法处理，因此必须留下足够的内存以备急需。另外，当系统中空闲内存的数量太少时，要唤醒内核交换守护进程（kswapd），让其将内核中的某些页交换到外存，从而保证系统中有足够的空闲页块。为此，Linux系统定义了一个结构变量freepages。其定义如下：
-
+在buffered_rmqueue()中核心代码是__rmqueue()着个函数从相应的zone中取得多页面的操作，它是整个页面分配过程的真正分配页面的核心代码。
 ```c
-struct freepages_v1
+
+static struct page *__rmqueue(struct zone *zone, unsigned int order,
+						int migratetype)
 {
+	struct page *page;
 
-		unsigned int min;
+retry_reserve:
+	page = __rmqueue_smallest(zone, order, migratetype);
 
-		unsigned int low;
+	if (unlikely(!page) && migratetype != MIGRATE_RESERVE) {
+		page = __rmqueue_fallback(zone, order, migratetype);
 
-		unsigned int high;
+		if (!page) {
+			migratetype = MIGRATE_RESERVE;
+			goto retry_reserve;
+		}
+	}
 
-} freepages_t;
-
-freepages_t freepages ；
+	trace_mm_page_alloc_zone_locked(page, order, migratetype);
+	return page;
+}
 ```
+首先通过 __rmqueue_smallest()函数，尝试找到恰好满足给定的order大小、migratetype类型的页面块。
 
-   这里划定了三条线：min、low和high。系统中空闲物理页数绝对不要少于freepages.min；当系统中空闲物理页数少于freepages.low时，开始强化交换；当空闲物理页数少于freepages.high时，启动后台交换；而当空闲物理页数大于freepages.high时，内核交换守护进程什么也不做。在系统初始化时，变量freepages被赋予了初值，其各个界限值的大小是根据实际的物理内存大小计算出来的。
+若在区域链表中，找不到给你order大小和migratetype类型的页面块，就要调用__rmqueue_fallback()从fallback链表中分配指定order和migrate页面块。
 
-   全局变量nr_free_pages中记录的是系统中当前空闲的物理页数。
+下面分析__rmqueue_smallest()和__rmqueue_fallback()函数
 
-   上面一段程序即使判断系统中空闲物理页数是否低于freepages.min界限，如果空闲物理页数大于freepages.min界限，则正常分配；否则，换页。
+1. __rmqueue_smallest()
 
-#### 3. 正常分配。从free_area数组的第order项开始。
-
-##### 1. 如果该链表中有满足要求的页块，则：
-
-* 将其从链表中摘下；
-
-* 将free_area数组的位图中该页块所对应的位取反，表示页块已用；
-
-* 修改全局变量nr_free_pages（减去分配出去的页数）；
-
-* 根据该页块在mem_map数组中的位置，算出其起始物理地址，返回。
-
-##### 2. 如果该链表中没有满足要求的页块，则在free_area数组中顺序向上查找。其结果有二：
-
-a).  整个free_area数组中都没有满足要求的页块，此次无法分配，返回。
-
-b).  找到一个满足要求的页块，则：
-
-*   将其从链表中摘下；
-
-*   将free_area数组的位图中该页块所对应的位取反，表示页块已用；
-
-*   修改全局变量nr_free_pages（减去分配出去的页数）；
-
-*   因为页块比申请的页块要大，所以要将它分成适当大小的块。因为所有的页块都由2的幂次的页数组成，所以这个分割的过程比较简单，只需要将它平分就可以：
-
-a).  将其平分为两个伙伴，将小伙伴加入free_area数组中相应的链表，修改位图中相应的位；
-
-b).  如果大伙伴仍比申请的页块大，则转I，继续划分；
-
-c).  大伙伴的大小正是所要的大小，修改位图中相应的位,根据其在mem_map数组中的位置，算出它的起始物理地址，返回。
-
-##### 4. 换页。通过下列语句调用函数try_to_free_pages（），启动换页进程。
-```
-   try_to_free_pages(gfp_mask);
-```
-   该函数所做的工作非常简单：唤醒内核交换守护进程kswapd。
 ```c
-   wake_up_process(kswapd_process);
-```
-   其中kswapd_process是指向内核交换守护进程kswapd的指针。
+c inline
+struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
+						int migratetype)
+{
+	unsigned int current_order;
+	struct free_area * area;
+	struct page *page;
+	for (current_order = order; current_order < MAX_ORDER; ++current_order) {
+		area = &(zone->free_area[current_order]);
+		if (list_empty(&area->free_list[migratetype]))
+			continue;
 
-例如在图4.10中，如果请求2页的内存块，第一个4页块（起始于页编号4）将会被分为两个2页块。起始于页号6的第二个2页块将会被返回给调用者，而第一个2页块（起始于页号4）将会排在free_area数组下表1中大小为2页的空闲块链表中。
+		page = list_entry(area->free_list[migratetype].next,
+							struct page, lru);
+		list_del(&page->lru);
+		rmv_page_order(page);
+		area->nr_free--;
+		expand(zone, page, order, current_order, area, migratetype);
+		return page;
+	}
+
+	return NULL;
+}
+
+```
+
+分配页面快的步骤如下：
+(1) 从order开始的空闲块立案表上开始找空闲的块;
+
+(2) 若当前order上有空闲的页面块，则摘除空闲块并且跳转到步骤(4);
+
+(3) 若当前order上没有控线页面块，则order = order + 1 ，跳转需要到上一级查找是否有空闲块，跳转到步骤(2)执行；若order > MAX_ORDER - 1， 则跳转到步骤(5);
+
+(4) 若分配页面块所在order大于请求值，还要将剩余部分页面块放在更低的order链表上，页面分配成功返回；
+
+(5) 页面分配失败返回。
+
+2. __rmqueue_fallback()
+
+```c
+
+
+__rmqueue_fallback(struct zone *zone, int order, int start_migratetype)
+{
+	struct free_area * area;
+	int current_order;
+	struct page *page;
+	int migratetype, i;
+
+	for (current_order = MAX_ORDER-1; current_order >= order;
+						--current_order) {
+		for (i = 0;; i++) {
+			migratetype = fallbacks[start_migratetype][i];
+
+			if (migratetype == MIGRATE_RESERVE)
+				break;
+
+			area = &(zone->free_area[current_order]);
+			if (list_empty(&area->free_list[migratetype]))
+				continue;
+
+			page = list_entry(area->free_list[migratetype].next,
+					struct page, lru);
+			area->nr_free--;
+
+		
+			if (!is_migrate_cma(migratetype) &&
+			    (unlikely(current_order >= pageblock_order / 2) ||
+			     start_migratetype == MIGRATE_RECLAIMABLE ||
+			     page_group_by_mobility_disabled)) {
+				int pages;
+				pages = move_freepages_block(zone, page,
+								start_migratetype);
+
+				if (pages >= (1 << (pageblock_order-1)) ||
+						page_group_by_mobility_disabled)
+					set_pageblock_migratetype(page,
+								start_migratetype);
+
+				migratetype = start_migratetype;
+			}
+
+			list_del(&page->lru);
+			rmv_page_order(page);
+
+
+			if (current_order >= pageblock_order &&
+			    !is_migrate_cma(migratetype))
+				change_pageblock_range(page, current_order,
+							start_migratetype);
+
+			expand(zone, page, order, current_order, area,
+			       is_migrate_cma(migratetype)
+			     ? migratetype : start_migratetype);
+
+			trace_mm_page_alloc_extfrag(page, order, current_order,
+				start_migratetype, migratetype);
+
+			return page;
+		}
+	}
+
+	return NULL;
+}
+```
+__rmqueue_fallback()函数分配过程和__rmqueue_smallest()类似，区别在于在fallback链表中进行，而不是在本节点上的zone区域。
+
+
 
 ### 4.4.4 物理页面的回收 
 
@@ -267,7 +520,7 @@ c).  大伙伴的大小正是所要的大小，修改位图中相应的位,根�
 
 函数free_pages用于页块的回收，其定义如下：
 ```c
-void free_pages(unsigned long addr, unsigned long order)
+void free_pages(unsigned long addr, unsigned int order)
 ```
 其中addr是要回收的页块的首地址；
 
@@ -333,12 +586,9 @@ Linux把缓冲区分为专用和通用，它们分别用于不同的目的，下
 inode等。缓冲区是用kmem_cache_t类型描述的，通过kmem_cache_create（）来建立，函数原型为：
 
 ```c
-kmem_cache_t *kmem_cache_create(const char *name, size_t size, size_t
-offset, unsigned long c_flags,
-
-void (*ctor) (void *objp, kmem_cache_t *cachep, unsigned long flags),
-
-void (*dtor) (void *objp, kmem_cache_t *cachep, unsigned long flags))
+struct kmem_cache *
+kmem_cache_create(const char *name, size_t size, size_t align,
+		  unsigned long flags, void (*ctor)(void *))
 ```
 
    对其参数说明如下：
@@ -349,7 +599,7 @@ void (*dtor) (void *objp, kmem_cache_t *cachep, unsigned long flags))
 
    offset： 在缓冲区内第一个对象的偏移，用来确定在页内进行对齐的位置，缺省为0，表示标准对齐。
 
-   c_flags： 对缓冲区的设置标志：
+   flags： 对缓冲区的设置标志：
 
    SLAB_HWCACHE_ALIGN： 表示与第一个缓冲区中的缓冲行边界（16或32字节）对齐。
    SLAB_NO_REAP： 不允许系统回收内存
@@ -358,11 +608,6 @@ void (*dtor) (void *objp, kmem_cache_t *cachep, unsigned long flags))
 
    ctor： 构造函数（一般都为NULL)
 
-   dtor： 析构函数（一般都为NULL)
-
-   objp： 指向对象的指针
- 
-   cachep： 指向缓冲区
 
 但是，函数kmem_cache_create（）所创建的缓冲区中还没有包含任何Slab，因此，也没有空闲的对象。只有以下两个条件都为真时，才给缓冲区分配Slab：
 
@@ -375,7 +620,9 @@ void (*dtor) (void *objp, kmem_cache_t *cachep, unsigned long flags))
    创建缓冲区之后，就可以通过下列函数从中获取对象：
 
 ```c
-   void *kmem_cache_alloc(kmem_cache_t *cachep, int flags)
+
+	void *kmem_cache_alloc(struct kmem_cache *cachep,gfp_t flags)
+
 ```
 
 该函数从给定的缓冲区cachep中返回一个指向对象的指针。如果缓冲区中所有的slab中都没有空闲的对象，那么
@@ -384,7 +631,7 @@ slab必须调用__get_free_pages()获取新的页面，flags是传递给该函�
    最后释放一个对象，并把它返回给原先的slab，这使用下面这个函数：
 
 ```c
-   void kmem_cache_free(kmem_cache_t *cachep, void *objp)
+	void kmem_cache_free(struct kmem_cache *cachep, void *objp)
 ```
 
    这样就能把cachep中的对象objp标记为空闲了。
@@ -396,18 +643,16 @@ slab必须调用__get_free_pages()获取新的页面，flags是传递给该函�
    首先，内核用一个全局变量存放指向task_struct缓冲区的指针：
 
 ```c
-   kmem_cache_t *task_struct_cachep;
+	kmem_cache *task_struct_cachep
 ```
 
    内核初始化期间，在fork_init()中会创建缓冲区：
 
 ```c
-task_struct_cachep = kmem_cache_create(“task_struct”, sizeof(struct
-task_struct), 0, SLAB _HWCACHE_ALIGN,NULL,NULL)
 
-		if (!task_struct_cachep)
-
-  		printk(“fork_init(): cannot create task_sturct SLAB cache”);
+task_struct_cachep =
+		kmem_cache_create("task_struct", sizeof(struct task_struct),
+			ARCH_MIN_TASKALIGN, SLAB_PANIC | SLAB_NOTRACK, NULL);
 ```
 
 这样就创建了一个名为task_struct_cachep的缓冲区，其中存放的就是类型为struct
@@ -504,16 +749,16 @@ kfree(buf)
 描述非连续区的数据结构为struct vm_struct：
 
 ```c
+
 struct vm_struct {
-
-		unsigned long flags;
-
-		void * addr;
-
-		unsigned long size;
-
-		struct vm_struct * next;
-
+	struct vm_struct	*next;
+	void			*addr;
+	unsigned long		size;
+	unsigned long		flags;
+	struct page		**pages;
+	unsigned int		nr_pages;
+	phys_addr_t		phys_addr;
+	const void		*caller;
 };
 ```
 
