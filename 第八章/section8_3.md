@@ -6,10 +6,7 @@
 VFS
 中进行注册。如果文件系统是作为内核可装载的模块，则在实际安装时进行注册，并在模块卸载时注销。
 
-&emsp;&emsp;每个文件系统都有一个初始化例程，它的作用就是在 VFS 中进行注册，即填写一个叫做
-file\_system\_type的数据结构，该结构包含了文件系统的名称以及一个指向对应的 VFS
-超级块读取例程的地址。所有已注册的文件系统的file\_system\_type结构形成一个链表，我们把这个链表称为注册链表。图8.7所示就是内核中的
-file\_system\_type 链表，链表头由 file\_systems 变量指定。
+&emsp;&emsp;每个文件系统都有一个初始化例程，它的作用就是在VFS中进行注册，即填写一个叫做file\_system\_type 的数据结构，该结构包含了文件系统的名称以及一个指向对应的VFS超级块读取例程的地址。所有已注册的文件系统的file\_system\_type结构形成一个链表，我们把这个链表称为注册链表。图8.7所示就是内核中的file\_system\_type 链表，链表头由 file\_systems 变量指定。
 
 <div align=center>
 <img src="图8_7.png" />  
@@ -20,12 +17,12 @@ file\_system\_type 链表，链表头由 file\_systems 变量指定。
 </div>
 
 &emsp;&emsp;图8.7 仅示意性地说明系统中已安装的三个文件系统
-Ext2、proc及iso9660的file\_system\_type结构所形成的链表。当然，系统中实际安装的文件系统要更多。
+Ext2、proc 及 iso9660 的 file\_system\_type 结构所形成的链表。当然，系统中实际安装的文件系统要更多。
 
-&emsp;&emsp;file\_system\_type的数据结构定义如下：
+&emsp;&emsp;file\_system\_type 的数据结构定义如下：
 ```c
     struct file_system_type {
-          const char *name;/*文件系统的类型名*/
+        const char *name;/*文件系统的类型名*/
 	int fs_flags;/*文件系统的一些特性*/
 	...
 	struct module *owner;/*通常置为宏THIS_MODLUE，用以确定是否把文件系统作为模块来安装*/
@@ -33,8 +30,8 @@ Ext2、proc及iso9660的file\_system\_type结构所形成的链表。当然，�
 	...
     };
 ```
-&emsp;&emsp;要对一个文件系统进行注册，就调用register\_filesystem（）函数。如果不再需要这个文件系统，还可以撤消这个注册，即从注册链表中删除一个file\_system\_type
-结构，此后系统不再支持该种文件系统。unregister\_filesystem()函数就起这个作用的，它在执行成功后返回0，如果注册链表中本来就没有指定的要删除的结构，则返回-1。
+&emsp;&emsp;要对一个文件系统进行注册，就调用 register\_filesystem() 函数。如果不再需要这个文件系统，还可以撤消这个注册，即从注册链表中删除一个file\_system\_type
+结构，此后系统不再支持该种文件系统。unregister\_filesystem() 函数就起这个作用的，它在执行成功后返回0，如果注册链表中本来就没有指定的要删除的结构，则返回-1。
 
 &emsp;&emsp;我们可以通过8.2.7 节的方法来观察系统现有注册的文件系统，现在动手吧！
 
@@ -46,7 +43,7 @@ Ext2、proc及iso9660的file\_system\_type结构所形成的链表。当然，�
 ```c
     struct mount
     {
-           struct list_head mnt_hash;/* 哈希表 */
+        struct list_head mnt_hash;/* 哈希表 */
 	struct mount *mnt_parent;/*指向上一层安装点的指针*/
 	struct dentry *mnt_mountpoint;/* 安装点的目录项 */
 	...
@@ -73,7 +70,7 @@ Ext2、proc及iso9660的file\_system\_type结构所形成的链表。当然，�
 
 &emsp;&emsp;一旦在系统中安装了根文件系统，就可以安装其他的文件系统。每个文件系统都可以安装在系统目录树中的一个目录上。
 
-&emsp;&emsp;前面我们介绍了以命令方式来安装文件系统，在用户程序中要安装一个文件系统则可以调用mount（）系统调用,其内核实现函数为sys\_mount()。安装过程主要工作是创建安装点对象，将其挂接到根文件系统的指定安装点下，然后初始化超级块对象，从而获得文件系统基本信息和相关的操作。
+&emsp;&emsp;前面我们介绍了以命令方式来安装文件系统，在用户程序中要安装一个文件系统则可以调用 mount()系统调用,其内核实现函数为 sys\_mount()。安装过程主要工作是创建安装点对象，将其挂接到根文件系统的指定安装点下，然后初始化超级块对象，从而获得文件系统基本信息和相关的操作。
 
 ### 8.3.3 文件系统的卸载
 
