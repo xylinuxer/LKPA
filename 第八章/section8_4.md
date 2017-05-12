@@ -6,34 +6,33 @@
 
 &emsp;&emsp;open()系统调用就是打开文件，它返回一个文件描述符。所谓打开文件实质上是在进程与文件之间建立起一种连接，而“文件描述符”唯一地标识着这样一个连接。在文件系统的处理中，每当一个进程打开一个文件时，就建立起一个独立的读／写文件“上下文”，这个“上下文”由file数据结构表示。另外，打开文件，还意味着将目标文件的索引节点从磁盘载入内存，并对其进行初始化。
 
-&emsp;&emsp;open操作在内核中是由sys\_open()函数完成的，其代码如下：
+&emsp;&emsp;open操作在内核中是由do\_sys\_open()函数完成的，其代码如下：
 ```c
-    asmlinkage long sys_open(const char * filename, int flags, int mode)
-    {
-            char * tmp;
-            int fd, error;
-            tmp = getname(filename);
-            fd = PTR_ERR(tmp);
-            if (!IS_ERR(tmp)) {
-            fd = get_unused_fd();
-            if (fd >= 0) {
-            struct file *f = filp_open(tmp, flags, mode);
-            error = PTR_ERR(f);
-            if (IS_ERR(f))
-            goto out_error;
-            fd_install(fd, f);
-            }
-            out: putname(tmp);
-    }
+    long do_sys_open(int dfd, const char __user *filename, int flags, umode_t mode)
+{
+	struct open_flags op;
+	int lookup = build_open_flags(flags, mode, &op);
+	struct filename *tmp = getname(filename);
+	int fd = PTR_ERR(tmp);
 
-            return fd;
-            out_error:
-            put_unused_fd(fd);
-            fd = error;
-            goto out;
-    }
+	if (!IS_ERR(tmp)) {
+		fd = get_unused_fd_flags(flags);
+		if (fd >= 0) {
+			struct file *f = do_filp_open(dfd, tmp, &op, lookup);
+			if (IS_ERR(f)) {
+				put_unused_fd(fd);
+				fd = PTR_ERR(f);
+			} else {
+				fsnotify_open(f);
+				fd_install(fd, f);
+			}
+		}
+		putname(tmp);
+	}
+	return fd;
+}
 ```
-&emsp;&emsp;其中，调用参数filename是文件的路径名（绝对路径名或相对路径名）；mode表示打开的模式，如“只读”等；而flag则包含许多标志位，用以表示打开模式以外的一些属性和要求。函数通过getname()从用户空间把文件的路径名拷贝到内核空间，并通过get\_unused\_fd()从当前进程的“打开文件表”中找到一个空闲的表项，该表项的下标即为“文件描述符fd”。然后，通过file\_open()找到文件名对应索引节点的dentry结构以及ionde结构，并找到或创建一个由file数据结构代表的读／写文件的“上下文”。通过fd\_install()函数，将新建的file数据结构的指针“安装”到当前进程的file\_struct结构中，也就是已打开文件指针数组中，其位置即已分配的下标fd。
+&emsp;&emsp;其中，调用参数filename是文件的路径名（绝对路径名或相对路径名）；mode表示打开的模式，如“只读”等；而flag则包含许多标志位，用以表示打开模式以外的一些属性和要求。函数通过getname()从用户空间把文件的路径名拷贝到内核空间，并通过get\_unused\_fd\_flags(flags)从当前进程的“打开文件表”中找到一个空闲的表项，该表项的下标即为“文件描述符fd”。然后，通过do\_filp\_open()找到文件名对应索引节点的dentry结构以及ionde结构，并找到或创建一个由file数据结构代表的读／写文件的“上下文”。通过fd\_install()函数，将新建的file数据结构的指针“安装”到当前进程的file\_struct结构中，也就是已打开文件指针数组中，其位置即已分配的下标fd。
 
 &emsp;&emsp;在以上过程中，如果出错，则将分配的文件描述符、file结构收回，inode也被释放，函数返回一个负数以示出错，其中PTR\_ERR（）和IS\_ERR（）是出错处理函数。
 
@@ -67,7 +66,7 @@
 6.  返回实际传送的字节数。
 
 &emsp;&emsp;以上概述了文件读写的基本步骤，但是f\_op-\>read或
-f\_op-\>write两个方法属于VFS提供的抽象方法，对于具体的文件系统，必须调用针对该具体文件系统的具体方法。而对基于磁盘的文件系统，比如EXT2等，所调用的具体的读写方法都是Linux内核已提供的通用函数generic\_file\_read()或generic\_file\_write()。简单地说，这些通用函数的作用是确定正被访问数据所在物理块的位置，并激活块设备驱动程序开始数据传送，所以基于磁盘的文件系统没必要再实现专用函数了。下面对generic\_file\_read()函数所执行的主要步骤简述如下：
+f\_op-\>write两个方法属于VFS提供的抽象方法，对于具体的文件系统，必须调用针对该具体文件系统的具体方法。而对基于磁盘的文件系统，比如EXT4等，所调用的具体的读写方法都是Linux内核已提供的通用函数generic\_file\_read()或generic\_file\_write()。简单地说，这些通用函数的作用是确定正被访问数据所在物理块的位置，并激活块设备驱动程序开始数据传送，所以基于磁盘的文件系统没必要再实现专用函数了。下面对generic\_file\_read()函数所执行的主要步骤简述如下：
 
 第一步：利用给定的文件偏移量和读写字节数计算出数据所在页的逻辑号(index)。
 
