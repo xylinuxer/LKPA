@@ -6,7 +6,7 @@
 
 &emsp;&emsp;我们对操作系统的认识一般是从使用开始的。打开计算机，呈现在眼前的首先是操作系统。如果用户打开的是操作系统字符界面，就可以通过命令完成需要的操作，例如在Linux下拷贝一个文件
 
-`cp  /home/TEST  /mydir/test`
+    cp  /home/TEST  /mydir/test
 
 上述命令可以把/home目录下的TEST文件拷贝到mydir目录下，并更名为test。
 
@@ -20,14 +20,14 @@
 
 &emsp;&emsp;从程序开发者的角度看，开发者不用关心如何在内存存放变量、数据，如何从外存存取数据，如何把数据在输出设备上显示出来等等。例如在Linux下实现cp命令的C语言片段为：
 
-    inf=open(“/home/TEST”,O_RDONLY);
-    out=open(“/mydir/test”,O_WRONLY);
+    inf = open("/home/TEST", O_RDONLY);
+    outf = open("/mydir/test", O_WRONLY);
     do{
-       len=read(inf,buf,4096);
-       write(outf,buf,len);
-       } while(len);
-         close(outf);
-         close(inf);
+	    len = read(inf, buf, 4096);
+	    write(outf, buf, len);
+    } while(len);
+    close(inf);
+    close(outf);
 
 &emsp;&emsp;在这段程序中，涉及到四个函数open(), close(),write()和read()，这些都是C语言函数库中的函数。进一步追究，这些函数都要涉及I/O操作，因此，它们的实现必须调用操作系统所提供的接口，也就是说，打开文件、关闭文件、读写文件的具体实现是由操作系统完成的。这些操作非常繁琐，操作系统不同，其具体实现可能不同。
 
@@ -42,12 +42,12 @@
 
 &emsp;&emsp;下面从一个程序的执行过程，我们看一下操作系统起什么样的作用。一个简单的C程序如下，其名为**test.c**：
 
-    #include<stdio.h>
+    #include <stdio.h>
     main()
     {
-      printf(“ Hello world\n”);
-      return 0;
-     }
+	    printf(" Hello world\n");
+	    return 0;
+    }
 &emsp;&emsp;用户对这个程序编译并连接:
 
     gcc test.c –o test
