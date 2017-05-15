@@ -88,6 +88,7 @@ struct resource iomem_resource = {
 
 &emsp;&emsp;\_\_check\_region()：检查指定的I/O 区域是否已被占用  
   
+  
 &emsp;&emsp;3.管理I/O端口资源　　　
 　  
 &emsp;&emsp;采用I/O端口的X86处理器为外设实现了一个单独的地址空间，也即“I/O空间”或称为“I/O端口空间”，其大小是64KB(0x0000-0xffff)。Linux在其所支持的所有平台上都实现了“I/O端口空间”这一概念。  
@@ -101,6 +102,7 @@ struct resource iomem_resource = {
 &emsp;&emsp;check\_region()：检查I/O端口空间中的指定I/O端口资源是否已被占用。
 
 &emsp;&emsp;release\_region()：释放I/O端口空间中的指定I/O端口资源。  
+  
   
 &emsp;&emsp;4.管理I/O内存资源　　  
    
