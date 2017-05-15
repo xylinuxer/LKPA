@@ -45,9 +45,6 @@ Linux使用的同步机制可以说随着内核版本的不断发展而完善。
 |atomic\_add\_return(i, v)    |   把i加到\*v，并返回相加之后的值|
 |atomic\_sub\_return(i, v)    |  从\*v中减去i,并返回相减之后的值|
 
-
-
-
 &emsp;&emsp;下面举例说明这些函数的用法：
 
 &emsp;&emsp;定义一个atomic\_t类型的数据很简单，还可以定义时给它设定初值：
@@ -72,7 +69,7 @@ Linux使用的同步机制可以说随着内核版本的不断发展而完善。
 ```c
     int atomic_dec_and_test(atomic_t *v)
 ```
-这个函数让给定的原子变量减1，如果结果为0，就返回1；否则返回0。
+&emsp;&emsp;这个函数让给定的原子变量减1，如果结果为0，就返回1；否则返回0。
 
 &emsp;&emsp;Linux内核也提供了位原子操作，相应的操作函数有set_bit(nr,addr)，clear_bit(nr,addr)，test_bit(nr,addt)等，它被广泛的应用于内存管理，设备驱动，读者可自行仔细探究。
 
@@ -115,14 +112,14 @@ Linux使用的同步机制可以说随着内核版本的不断发展而完善。
 ```c
     DEFINE_RWLOCK(mr_lock);
 ```
-在读者的代码分支中使用如下函数：
+&emsp;&emsp;在读者的代码分支中使用如下函数：
 
 ```c
     read_lock(&mr_rwlock);
     /*只读临界区*/
     read_unlock(&mr_rwlock);
 ```
-在写者的代码分支中使用如下函数：
+&emsp;&emsp;在写者的代码分支中使用如下函数：
 ```c
     write_lock(&mr_rwlock);
     /*写临界区*/
@@ -143,7 +140,7 @@ Linux使用的同步机制可以说随着内核版本的不断发展而完善。
 
 #### 1.信号量的定义
 
-内核中对信号量的定义如下：
+&emsp;&emsp;内核中对信号量的定义如下：
 ```c
     struct semaphore {
             raw_spinlock_t lock;
@@ -152,22 +149,21 @@ Linux使用的同步机制可以说随着内核版本的不断发展而完善。
     }
 ```
 
-其各个域的含义如下：
+&emsp;&emsp;其各个域的含义如下：
 
-**count:**
+&emsp;&emsp;**count:**
 
-存放unsigned
-int类型的一个值。如果该值大于0，那么资源就是空闲的，也就是说，该资源现在可以使用。相反，如果count等于0，那么信号量是忙的，但没有进程等待这个被保护的资源。最后，如果count为负数，则资源是不可用的，并至少有一个进程等待资源。
+&emsp;&emsp;存放unsigned int类型的一个值。如果该值大于0，那么资源就是空闲的，也就是说，该资源现在可以使用。相反，如果count等于0，那么信号量是忙的，但没有进程等待这个被保护的资源。最后，如果count为负数，则资源是不可用的，并至少有一个进程等待资源。
 
-**lock:**
+&emsp;&emsp;**lock:**
 
-自旋锁。这个字段是在linux内核高版本中加入的，为了防止多处理器并行造成错误。
+&emsp;&emsp;自旋锁。这个字段是在linux内核高版本中加入的，为了防止多处理器并行造成错误。
 
-**wait_list:**
+&emsp;&emsp;**wait_list:**
 
-存放等待队列链表的地址，当前等待资源的所有睡眠进程都放在这个链表中。当然，如果count大于或等于0，等待队列就为空。
+&emsp;&emsp;存放等待队列链表的地址，当前等待资源的所有睡眠进程都放在这个链表中。当然，如果count大于或等于0，等待队列就为空。
 
->注意：在使用信号量的时候，不要直接访问semaphore结构体内的成员，而要使用内核提供的函数来操作。
+>&emsp;&emsp;注意：在使用信号量的时候，不要直接访问semaphore结构体内的成员，而要使用内核提供的函数来操作。
 
 
 #### 2.相关操作函数
@@ -187,7 +183,7 @@ int类型的一个值。如果该值大于0，那么资源就是空闲的，也�
     }
 ```
 
-&emsp;&emsp;像down\_interrputible()等其他一些获取信号量的函数与down()类似，在此不一一解释。从上面的分析也可以看出，如果无信号量可用，则当前进程进入睡眠状态。其中的\_down()函数调用\_down\_common()，这是各种down操作的统一函数：
+&emsp;&emsp;像down\_interrputible()等其他一些获取信号量的函数与down()类似，在此不一一解释。从上面的分析也可以看出，如果无信号量可用，则当前进程进入睡眠状态。其中的\__down()函数调用\__down\_common()，这是各种down操作的统一函数：
 
 ```c
     static inline int __sched __down_common(struct semaphore *sem, long state,long timeout)
@@ -220,7 +216,7 @@ int类型的一个值。如果该值大于0，那么资源就是空闲的，也�
     }
 ```
 
-其中semaphore_waiter的定义为：
+&emsp;&emsp;其中semaphore_waiter的定义为：
 
 ```c
     struct semaphore_waiter {
@@ -262,22 +258,22 @@ int类型的一个值。如果该值大于0，那么资源就是空闲的，也�
 
 &emsp;&emsp;要使用信号量，需要包含头文件 < linux/semaphore.h >，其中有信号量的定义和操作函数。
 
-##### (1).信号量的创建和初始化
+##### (1)信号量的创建和初始化
 
-内核提供了多种方法来创建信号量。如果要定义一个互斥信号量，则可以使用：
+&emsp;&emsp;内核提供了多种方法来创建信号量。如果要定义一个互斥信号量，则可以使用：
 
-DEFINE\_SEMAPHORE(name);
+&emsp;&emsp;DEFINE\_SEMAPHORE(name);
 
-参数name为要定义的信号量的名字。如果信号量已经被定义，只需将其进行初始化，则可以使用以下函数：
+&emsp;&emsp;参数name为要定义的信号量的名字。如果信号量已经被定义，只需将其进行初始化，则可以使用以下函数：
 
 ```c
     sema_init(struct semaphore *sem, int val); /*
         初始化信号量sem的使用者数量为val */
 ```
 
-##### (2).信号量的使用
+##### (2)信号量的使用
 
- 信号量的一般使用形式为：
+&emsp;&emsp;信号量的一般使用形式为：
 
 ```c
     static DEFINE_SEMAPHORE(mr_sem);/*声明并初始化互斥信号量*/
@@ -293,24 +289,18 @@ DEFINE\_SEMAPHORE(name);
 &emsp;&emsp;同自旋锁一样，信号量在内核中也有许多变种，比如读者－写者信号量等，这里不做一一介绍。下表是信号量的操作函数列表：
 
 |函数                       |     描述  |                        
-|------                     |    ---|                           
-|                           |     |               
+|------                     |    ---|                                         
 |down(struct semaphore \*); | 获取信号量，如果不可获取，|
 |                           | 则进入不可中断睡眠状态（目前已经不建议使用）。|
-|                           ||
 |down\_interruptible        | 获取信号量，如果不可获取，|               
 |(struct semaphore \*);     | 则进入可中断睡眠状态。|
-|                           ||
 |down\_killable             | 获取信号量，如果不可获取，|
 |(struct semaphore \*);     | 则进入可被致命信号中断的睡眠状态。 |
-|                          ||
 |down\_trylock              |  尝试获取信号量，|
 |(struct semaphore \*);     |  如果不能获取，则立刻返回。|
- |                          ||
 |down\_timeout              | 在给定时间（jiffies）|
 |(struct semaphore \*,      | 内获取信号量，如果不能够获取，|
 |long jiffies);             | 则返回。|
-|                           | |
 |up(struct semaphore \*);   | 释放信号量。 |
 
 #### 4.信号量和自旋锁区别
@@ -322,11 +312,7 @@ DEFINE\_SEMAPHORE(name);
 |需求                     | 建议的加锁方法|
 |------                   | ---|
 |低开销加锁               | 优先使用自旋锁|
-|||
 |短期锁定                 | 优先使用自旋锁|
-|||
 |长期加锁                 | 优先使用信号量|
-|||
 |中断上下文中加锁         | 使用自旋锁|
-|||
 |持有锁时需要睡眠、调度   | 使用信号量|
