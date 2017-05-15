@@ -59,6 +59,7 @@ struct resource iomem_resource = {
 };  
 ```
    
+   
 &emsp;&emsp;其中，宏IO\_SPACE\_LIMIT表示整个I/O空间的大小，对于X86平台而言，它是0xffff(定义在arch/x86/include/asm/io.h头文件中)。
 
 &emsp;&emsp;任何设备驱动程序都可以使用下面三个函数申请、分配和释放资源，传递给它们的参数为资源树的根节点和要插入的新资源数据结构的地址：
@@ -153,8 +154,7 @@ void iounmap(void *addr);
 struct resource *requset_mem_region(unsigned long start, unsigned long len,char *name);  
 ```
 
-&emsp;&emsp;这个函数从内核申请len个内存地址（在3G\~4G之间的虚地址），而这里的start为I/O物理地址，name为设备的名称。(注意，如果分配成功，则返回非NULL，否则，返回NULL。)  
-另外，可以通过/proc/iomem查看系统给各种设备的内存范围。
+&emsp;&emsp;这个函数从内核申请len个内存地址（在3G\~4G之间的虚地址），而这里的start为I/O物理地址，name为设备的名称。(注意，如果分配成功，则返回非NULL，否则，返回NULL。)另外，可以通过/proc/iomem查看系统给各种设备的内存范围。
 
 &emsp;&emsp;在将I/O内存的物理地址映射成内核虚地址后，理论上讲我们就可以象读写内存那样直接读写I/O内存。但是，由于在某些平台上，对
 I/O内存和系统内存有不同的访问处理，因此为了确保跨平台的兼容性，Linux实现了一系列读写I/O内存的函数，这些函数在不同的平台上有不同的实现。但在x86平台上，读写I/O内存与读写内存无任何差别，相关函数如下：
