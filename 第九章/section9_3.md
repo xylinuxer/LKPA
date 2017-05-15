@@ -129,7 +129,6 @@ struct resource iomem_resource = {
 
 &emsp;&emsp;port参数指定I/O端口空间中的端口地址。在大多数平台上(如x86)它都是unsigned short类型的，其它的一些平台上则是unsigned int类型的。显然，端口地址的类型是由I/O端口空间的大小来决定的。  
    
-   
 &emsp;&emsp;除了上述这些I/O操作外，某些CPU也支持对某个I/O端口进行连续的读写操作，也即对单个I/O端口读或写一系列字节、字或32位整数，这就是所谓的“串I/O指令”。这种指令在速度上显然要比用循环来实现同样的功能快得多。 
 ```
 insb() outsb() insw() outw() insl() outsl()  
