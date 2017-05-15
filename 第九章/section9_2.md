@@ -203,8 +203,7 @@
 
 &emsp;&emsp;(2) 通过cat /proc/devices 查看系统中未使用的字符设备主设备号，比如当前231未使用；
 
-&emsp;&emsp;(3) 创建设备文件结点：sudo mknod /dev/mycdev c 231 0；具体使用方法通过man  
-mknod命令查看；
+&emsp;&emsp;(3) 创建设备文件结点：sudo mknod /dev/mycdev c 231 0；具体使用方法通过man mknod命令查看；
 
 &emsp;&emsp;(4) 修改设备文件权限：sudo chmod 777 /dev/mycdev；
 
