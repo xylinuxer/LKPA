@@ -25,6 +25,7 @@
 &emsp;&emsp;Linux将基于I/O端口和I/O内存的映射方式通称为“I/O区域”(I/O Region)。在对I/O区域的管理讨论之前，我们首先来分析一下Linux是如何实现“I/O资源”这一抽象概念的。  
   
 &emsp;&emsp;1.Linux对I/O资源的描述  
+
 &emsp;&emsp;Linux设计了一个通用的数据结构resource来描述各种I/O资源(如I/O端口、I/O内存、DMA和IRQ等)。该结构定义在include/linux/ioport.h头文件中：  
 
 ``` c
@@ -76,7 +77,8 @@ struct resource iomem_resource = {
     $ cat /proc/ioports  
 ```
 
-2.管理I/O 区域资源　　　　  
+&emsp;&emsp;2.管理I/O 区域资源　　　　
+
 &emsp;&emsp;Linux将基于I/O端口和基于I/O内存的资源统称为“I/O区域”。I/O
 区域仍然是一种I/O资源，因此它仍然可以用resource结构类型来描述。Linux在头文件include/linux/ioport.h中定义了三个对I/O区域进行操作的接口函数：  
 
@@ -86,10 +88,12 @@ struct resource iomem_resource = {
 
 &emsp;&emsp;\_\_check\_region()：检查指定的I/O 区域是否已被占用  
   
-3.管理I/O端口资源　　　
+&emsp;&emsp;3.管理I/O端口资源　　　
 　  
+   
 &emsp;&emsp;采用I/O端口的X86处理器为外设实现了一个单独的地址空间，也即“I/O空间”或称为“I/O端口空间”，其大小是64KB(0x0000-0xffff)。Linux在其所支持的所有平台上都实现了“I/O端口空间”这一概念。  
    
+   
 &emsp;&emsp;由于I/O空间非常小，因此即使外设总线有一个单独的I/O端口空间，却也不是所有的外设都将其I/O端口(指寄存器)映射到“I/O端口空间”中。比如，大多数PCI卡都通过内存映射方式来将其I/O端口或外设内存映射到CPU的内存物理地址空间中。而老式的ISA卡通常将其I/O端口映射到I/O端口空间中。 
 
 &emsp;&emsp;Linux是基于“I/O区域”这一概念来实现对I/O端口资源的管理的。对I/O端口空间的操作基于I/O区域的操作函数\_\_xxx\_region()，Linux在头文件include/linux/ioport.h中定义了三个对I/O端口空间进行操作的接口函数：
@@ -100,7 +104,7 @@ struct resource iomem_resource = {
 
 &emsp;&emsp;release\_region()：释放I/O端口空间中的指定I/O端口资源。  
   
-4.管理I/O内存资源　　  
+&emsp;&emsp;4.管理I/O内存资源　　  
    
 &emsp;&emsp;基于I/O区域的操作函数\_\_xxx\_region()，Linux在头文件include/linux/ioport.h中定义了三个对I/O内存资源进行操作的接口：
 
@@ -120,14 +124,14 @@ struct resource iomem_resource = {
 ```c
     unsigned char inb(unsigned port);  
 ```
+
 &emsp;&emsp;port参数指定I/O端口空间中的端口地址。在大多数平台上(如x86)它都是unsigned short类型的，其它的一些平台上则是unsigned int类型的。显然，端口地址的类型是由I/O端口空间的大小来决定的。  
    
 &emsp;&emsp;除了上述这些I/O操作外，某些CPU也支持对某个I/O端口进行连续的读写操作，也即对单个I/O端口读或写一系列字节、字或32位整数，这就是所谓的“串I/O指令”。这种指令在速度上显然要比用循环来实现同样的功能快得多。 
 ```
 insb() outsb() insw() outw() insl() outsl()  
 ```
-&emsp;&emsp;另外，在一些平台上(典型地如X86)，对于老式总线(如ISA)上的慢速外设来说，如果CPU读写其I/O端口的速度太快，那就可能会发生丢失数据的现象。对于这个问题的解决方法就是在两次连续的I/O操作之间插入一段微小的时延，以便等待慢速外设。这就是所谓的“暂停
-I/O”。 
+&emsp;&emsp;另外，在一些平台上(典型地如X86)，对于老式总线(如ISA)上的慢速外设来说，如果CPU读写其I/O端口的速度太快，那就可能会发生丢失数据的现象。对于这个问题的解决方法就是在两次连续的I/O操作之间插入一段微小的时延，以便等待慢速外设。这就是所谓的“暂停I/O”。 
 
 &emsp;&emsp;对于暂停I/O，Linux也在io.h头文件中定义了它的I/O读写函数，而且都以XXX\_p命名，比如：inb\_p()、outb\_p()等等。  
 
@@ -148,7 +152,7 @@ void * ioremap(resource_size_t offset, unsigned long size);
 void iounmap(void *addr);
 ```
 
-在调用ioremap()之前，首先要调用requset\_mem\_region()函数申请资源，该函数的原型为：
+&emsp;&emsp;在调用ioremap()之前，首先要调用requset\_mem\_region()函数申请资源，该函数的原型为：
 
 ```c
 struct resource *requset_mem_region(unsigned long start, unsigned long len,char *name);  
@@ -159,10 +163,10 @@ struct resource *requset_mem_region(unsigned long start, unsigned long len,char 
 &emsp;&emsp;在将I/O内存的物理地址映射成内核虚地址后，理论上讲我们就可以象读写内存那样直接读写I/O内存。但是，由于在某些平台上，对
 I/O内存和系统内存有不同的访问处理，因此为了确保跨平台的兼容性，Linux实现了一系列读写I/O内存的函数，这些函数在不同的平台上有不同的实现。但在x86平台上，读写I/O内存与读写内存无任何差别，相关函数如下：
 
-readb() readw() readl()：读I/O内存  
+&emsp;&emsp;readb() readw() readl()：读I/O内存  
 
-writeb() writew() writel()：写I/O内存  
+&emsp;&emsp;writeb() writew() writel()：写I/O内存  
 
-memset\_io() memcpy\_fromio() memcpytoio()：拷贝I/O内存   
+&emsp;&emsp;memset\_io() memcpy\_fromio() memcpytoio()：拷贝I/O内存   
 
 &emsp;&emsp;为了保证驱动程序的跨平台的可移植性，建议开发者应该使用上面的函数来访问I/O内存。
