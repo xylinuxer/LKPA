@@ -79,6 +79,7 @@ Ext4写函数（而不是DOS文件系统的写函数）执行。
 
 &emsp;&emsp;虚拟文件系统（VFS）的第一个词是“虚拟”，这就意味着，这样的文件系统在磁盘（或其他存储介质上）并没有对应的存储信息。那么，这样一个虚无的文件系统到底怎样形成？尽管Linux支持多达几十种文件系统，但这些真实的文件系统并不是一下子都挂在系统中的，他们实际上是按需被挂载的。老子说：“有无相生”，这个“虚”的VFS的信息都来源于“实”的文件系统，所以VFS必须承载各种文件系统的共有属性。另外，这些实的文件系统只有安装到系统中，VFS才予以认可，也就是说，VFS只管理挂载到系统中的实际文件系统。  
  
+ 
 &emsp;&emsp;既然，VFS承担管家的角色，那么我们分析一下它到底要管哪些对象。Linux在文件系统的设计中，全然汲取了Unix的设计思想。Unix在文件系统的设计中抽象出四个概念：文件，目录项，索引节点和超级块。
 
 &emsp;&emsp;从本质上讲文件系统是特殊的数据分层存储结构，它包含文件、目录和相关的控制信息。文件系统的典型操作包含创建、删除和安装等等。如前所述，一个文件系统被挂载在根文件系统的某个枝叶上，这就是**安装点**，安装点在全局的层次结构中具有独立的命名空间。
@@ -148,7 +149,7 @@ int (*sync_fs)(struct super_block *sb, int wait);
 
 &emsp;&emsp;每一种文件系统都应该有自己的super\_operations操作实例。其主要函数的功能简述如下：
 
-&emsp;&emsp;put\_super（）释放超级块对象。
+&emsp;&emsp;put\_super（）：释放超级块对象。
 
 &emsp;&emsp;write\_inode（）：把inode写回磁盘。
 
@@ -262,7 +263,7 @@ struct dentry {
 &emsp;&emsp;对目录项进行操作的一组函数叫目录项操作表，由dentry\_operation结构描述：
 ```c
 struct dentry_operations {
-      int (*d_revalidate)(struct dentry *, unsigned int);
+        int (*d_revalidate)(struct dentry *, unsigned int);
 	int (*d_weak_revalidate)(struct dentry *, unsigned int);
 	int (*d_hash)(const struct dentry *, const struct inode *,
 			struct qstr *);
@@ -308,7 +309,7 @@ struct dentry_operations {
 ```c
     struct file
     {
-         	union {
+        union {
 		struct list_head	fu_list;/*所有打开的文件形成一个链表*/
 		struct rcu_head 	fu_rcuhead;
 	} f_u;
@@ -377,7 +378,7 @@ struct file_operations {
 &emsp;&emsp;**文件描述符**是用来描述打开的文件的。每个进程用一个files\_struct结构来记录文件描述符的使用情况，这个files\_struct结构称为**用户打开文件表**，它是进程的私有数据。该结构定义如下：
 ```c
 struct files_struct {
-      atomic_t count;/* 共享该表的进程数 */
+        atomic_t count;/* 共享该表的进程数 */
 	struct fdtable __rcu *fdt;
 	struct fdtable fdtab;
 	spinlock_t file_lock ____cacheline_aligned_in_smp;/*保护以下的所有域*/
@@ -407,7 +408,7 @@ struct files_struct {
 
 ```c
     struct fs_struct {
-           	int users;
+    	int users;
 	spinlock_t lock;
 	seqcount_t seq;
 	int umask;
