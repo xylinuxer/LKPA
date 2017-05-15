@@ -24,8 +24,8 @@ crw--w----. 1 root tty       4,  12 Sep 26 18:05 tty12
 
 ### 9.4.1.字符设备的数据结构
 
-&emsp;&emsp;Linux内核中使用struct
-cdev来表示一个字符设备，该结构位于include/linux/cdev.h：
+&emsp;&emsp;Linux内核中使用struct cdev来表示一个字符设备，该结构位于include/linux/cdev.h：
+
 ```c
     struct cdev {
             struct kobject kobj;
@@ -36,18 +36,18 @@ cdev来表示一个字符设备，该结构位于include/linux/cdev.h：
             unsigned int count;
     };
 ```
+
 &emsp;&emsp;其中主要字段的含义如下：
 
-&emsp;&emsp;kobj:
-kobject类似于面向对象语言中的对象（object）类,其中包含了引用计数、名称以及父指针等字段，可以创建对象的层次结构，属于驱动模型的基础对象。
+&emsp;&emsp;kobj：kobject类似于面向对象语言中的对象（object）类,其中包含了引用计数、名称以及父指针等字段，可以创建对象的层次结构，属于驱动模型的基础对象。
 
-&emsp;&emsp;owner:该设备的驱动程序所属的内核模块，一般设置为THIS\_MODULE; 
+&emsp;&emsp;owner：该设备的驱动程序所属的内核模块，一般设置为THIS\_MODULE; 
 
-&emsp;&emsp;ops:文件操作结构体指针，file\_operations结构体中包含一系列对设备进行操作的函数接口;  
+&emsp;&emsp;ops：文件操作结构体指针，file\_operations结构体中包含一系列对设备进行操作的函数接口;  
 
-&emsp;&emsp;dev:设备号。dev\_t封装了unsigned;
+&emsp;&emsp;dev：设备号。dev\_t封装了unsigned;
 
-&emsp;&emsp;int:该类型前12位为主设备号，后20位为次设备号;
+&emsp;&emsp;int：该类型前12位为主设备号，后20位为次设备号;
 
 &emsp;&emsp;cdev结构是内核对字符设备驱动的标准描述。在实际的设备驱动开发中，通常使用自定义的结构体来描述一个特定的字符设备。这个自定义的结构体中必然会包含cdev结构，另外还要包含一些描述这个具体设备某些特性的字段。比如,用一段全局内存（命名为globalmem）来模拟字符设备：
 
