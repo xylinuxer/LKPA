@@ -233,7 +233,7 @@ Linux使用的同步机制可以说随着内核版本的不断发展而完善。
 
 &emsp;&emsp;可见，使用down()操作获取信号量的时候，如果信号量不可获取，则进程进入睡眠等待状态，并且不可被信号中断。而down\_interruptible()调用\_down\_common()的形式为：
 ```c
-    _down_common(sem, TASK_INTERRUPTIBLE, MAX_SCHEDULE_TIMEOUT);
+    __down_common(sem, TASK_INTERRUPTIBLE, MAX_SCHEDULE_TIMEOUT);
 ```
 &emsp;&emsp;可见，进程在等待获取信号量的时候时可以被信号打断的。其他获取信号量的操作函数形式基本类似。
 
