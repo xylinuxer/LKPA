@@ -32,29 +32,17 @@ Linux使用的同步机制可以说随着内核版本的不断发展而完善。
 |**函数**|**说明**|
 |------|---|
 |ATOMIC\_INIT(i)|在声明一个atomic\_t变量时, 将它初始化为i;|
-|||
 |atomic\_read(v)|返回\*v。|
-|||
 |atomic\_set(v,i) |把\*v置成i|
-|||
 |atomic\_add(i,v)|给\*v增加i|
-||| 
 |atomic\_sub(i,v)|从\*v中减去i|
-|||
 |atomic\_sub\_and\_test(i, v) |   从\*v中减去i,如果结果为0，则返回1；否则，返回0|
-|||
 |atomic\_inc(v)|   把1加到 \*v|
-|||
 |atomic\_dec(v) |   从\*v减1|
-| ||
 |atomic\_dec\_and\_test(v) |   从\*v减1，如果结果为0，则返回1；否则，返回0|
-|||
 |atomic\_inc\_and\_test(v)    |   把1加到\*v，如果结果为0，则返回1；否则，返回0|
-|||
 |atomic\_add\_negative(i, v)  |   把i加到\*v，如果结果为负，则返回1；否则，返回0|
-|||
 |atomic\_add\_return(i, v)    |   把i加到\*v，并返回相加之后的值|
-|||
 |atomic\_sub\_return(i, v)    |  从\*v中减去i,并返回相减之后的值|
 
 
