@@ -15,15 +15,15 @@
 </div>
 
 &emsp;&emsp;一般来说，一个外设的寄存器通常被连续地编址。CPU对外设I/O端口物理地址的编址方式有两种：一种是 **I/O端口**，另一种是 **I/O内存**。而具体采用哪一种则取决于CPU的体系结构。  
-   
+
 &emsp;&emsp;有些体系结构的CPU(如PowerPC、m68k等)通常只实现一个物理地址空间(RAM)。在这种情况下，外设I/O端口的物理地址就被映射到CPU的单一物理地址空间中，而成为内存的一部分。此时，CPU可以象访问一个内存单元那样访问外设I/O端口，而不需要设立专门的外设I/O指令。这就是所谓的“**I/O内存**”。  
-   
+  
 &emsp;&emsp;而另外一些体系结构的CPU(典型地如X86)则为外设专门实现了一个单独地地址空间，称为“I/O端口空间”。这是一个与CPU的内存物理地址空间不同的地址空间，所有外设的I/O端口均在这一空间中进行编址。CPU通过设立专门的I/O指令(如X86的IN和OUT指令)来访问这一空间中的地址单元(也即I/O端口)。这就是所谓的“ **I/O端口**”。与内存物理地址空间相比，I/O地址空间通常都比较小，如x86CPU的I/O空间就只有64KB(0-0xffff)。这是“I/O端口”的一个主要缺点。
 
 ### 9.3.2 I/O资源管理  
 &emsp;&emsp;Linux将基于I/O端口和I/O内存的映射方式通称为“I/O区域”(I/O Region)。在对I/O区域的管理讨论之前，我们首先来分析一下Linux是如何实现“I/O资源”这一抽象概念的。  
   
-1.Linux对I/O资源的描述  
+&emsp;&emsp;1.Linux对I/O资源的描述  
 &emsp;&emsp;Linux设计了一个通用的数据结构resource来描述各种I/O资源(如I/O端口、I/O内存、DMA和IRQ等)。该结构定义在include/linux/ioport.h头文件中：  
 
 ``` c
@@ -39,11 +39,7 @@
 &emsp;&emsp;资源表示某个实体的一部分，这部分被互斥地分配给设备驱动程序。所有的同种资源都插入到一个树型数据结构（父亲、兄弟和孩子）中；
 节点的孩子被收集在一个链表中，其第一个元素由child指向，sibling字段指向链表中的下一个节点。  
   
-&emsp;&emsp;为什么使用树？例如，考虑一下IDE硬盘接口所使用的I/O端口地址－比如说从0xf000 到
-0xf00f。那么，start字段为0xf000，end字段为0xf00f的，控制器的名字存放在name字段中，这就是一颗资源树。但是，IDE设备驱动程序需要记住另外的信息，比如IDE主盘使用0xf000
-到 0xf007的子范围，从盘使用0xf008 到
-0xf00f的子范围。为了做到这点，设备驱动程序把两个子范围对应的孩子插入到从0xf000
-到 0xf00f的整个范围对应的资源下。
+&emsp;&emsp;为什么使用树？例如，考虑一下IDE硬盘接口所使用的I/O端口地址－比如说从0xf000到0xf00f。那么，start字段为0xf000，end字段为0xf00f的，控制器的名字存放在name字段中，这就是一颗资源树。但是，IDE设备驱动程序需要记住另外的信息，比如IDE主盘使用0xf000到 0xf007的子范围，从盘使用0xf008到0xf00f的子范围。为了做到这点，设备驱动程序把两个子范围对应的孩子插入到从0xf000到0xf00f的整个范围对应的资源下。
 
 &emsp;&emsp;Linux在kernel/resource.c文件中定义了全局变量ioport\_resource和iomem\_resource，它们来分别描述基于I/O端口的整个I/O端口空间和基于I/O内存的整个I/O内存资源空间，其定义如下：  
 ```c
@@ -66,11 +62,11 @@ struct resource iomem_resource = {
 
 &emsp;&emsp;任何设备驱动程序都可以使用下面三个函数申请、分配和释放资源，传递给它们的参数为资源树的根节点和要插入的新资源数据结构的地址：
 
+&emsp;&emsp;request\_resource( )：把一个给定范围分配给一个I/O设备。  
 
-&emsp;&emsp;request\_resource( ) 把一个给定范围分配给一个I/O设备。  
-allocate\_resource( )
-在资源树中寻找一个给定大小和排列方式的可用范围；若存在，将这个范围分配给一个I/O设备（主要由PCI设备驱动程序使用，可以使用任意的端口号和主板上的内存地址对其进行配置）。  
-release\_resource( ) 释放以前分配给I/O设备的给定范围。
+&emsp;&emsp;allocate\_resource( )：在资源树中寻找一个给定大小和排列方式的可用范围；若存在，将这个范围分配给一个I/O设备（主要由PCI设备驱动程序使用，可以使用任意的端口号和主板上的内存地址对其进行配置）。 
+
+&emsp;&emsp;release\_resource( )：释放以前分配给I/O设备的给定范围。
 
 &emsp;&emsp;当前分配给I/O设备的所有I/O地址的树都可以从/proc/ioports文件中查看，例如
 
@@ -82,11 +78,11 @@ release\_resource( ) 释放以前分配给I/O设备的给定范围。
 &emsp;&emsp;Linux将基于I/O端口和基于I/O内存的资源统称为“I/O区域”。I/O
 区域仍然是一种I/O资源，因此它仍然可以用resource结构类型来描述。Linux在头文件include/linux/ioport.h中定义了三个对I/O区域进行操作的接口函数：  
 
-\_request\_region() I/O 区域的分配  
+&emsp;&emsp;\_\_request\_region()：I/O 区域的分配  
 
-\_release\_region()  I/O 区域的释放  
+&emsp;&emsp;\_\_release\_region()：I/O 区域的释放  
 
-\_check\_region() 检查指定的I/O 区域是否已被占用  
+&emsp;&emsp;\_\_check\_region()：检查指定的I/O 区域是否已被占用  
   
 3.管理I/O端口资源　　　
 　  
@@ -94,29 +90,29 @@ release\_resource( ) 释放以前分配给I/O设备的给定范围。
    
 &emsp;&emsp;由于I/O空间非常小，因此即使外设总线有一个单独的I/O端口空间，却也不是所有的外设都将其I/O端口(指寄存器)映射到“I/O端口空间”中。比如，大多数PCI卡都通过内存映射方式来将其I/O端口或外设内存映射到CPU的内存物理地址空间中。而老式的ISA卡通常将其I/O端口映射到I/O端口空间中。 
 
-&emsp;&emsp;Linux是基于“I/O区域”这一概念来实现对I/O端口资源的管理的。对I/O端口空间的操作基于I/O区域的操作函数\_xxx\_region()，Linux在头文件include/linux/ioport.h中定义了三个对I/O端口空间进行操作的接口函数：
+&emsp;&emsp;Linux是基于“I/O区域”这一概念来实现对I/O端口资源的管理的。对I/O端口空间的操作基于I/O区域的操作函数\_\_xxx\_region()，Linux在头文件include/linux/ioport.h中定义了三个对I/O端口空间进行操作的接口函数：
 
-request\_region()    请求在I/O端口空间中分配指定范围的I/O端口资源。  
+&emsp;&emsp;request\_region()：请求在I/O端口空间中分配指定范围的I/O端口资源。  
 
-check\_region()      检查I/O端口空间中的指定I/O端口资源是否已被占用。
+&emsp;&emsp;check\_region()：检查I/O端口空间中的指定I/O端口资源是否已被占用。
 
-release\_region()    释放I/O端口空间中的指定I/O端口资源。  
+&emsp;&emsp;release\_region()：释放I/O端口空间中的指定I/O端口资源。  
   
 4.管理I/O内存资源　　  
    
-&emsp;&emsp;基于I/O区域的操作函数\_xxx\_region()，Linux在头文件include/linux/ioport.h中定义了三个对I/O内存资源进行操作的接口：  
+&emsp;&emsp;基于I/O区域的操作函数\_\_xxx\_region()，Linux在头文件include/linux/ioport.h中定义了三个对I/O内存资源进行操作的接口：
 
-request_mem_region() 请求分配指定的 I/O 内存资源。
+&emsp;&emsp;request_mem_region()：请求分配指定的 I/O 内存资源。
 
-check_mem_region() 检查指定的 I/O 内存资源是否已被占用。
+&emsp;&emsp;check_mem_region()：检查指定的 I/O 内存资源是否已被占用。
 
-release_mem_region() 释放指定的 I/O 内存资源。  
+&emsp;&emsp;release_mem_region()：释放指定的 I/O 内存资源。  
   
 ### 9.3.3 访问I/O端口空间
 
-   
 &emsp;&emsp;在驱动程序请求了I/O端口空间中的端口资源后，它就可以通过CPU的IO指令来读写这些I/O端口。在读写I/O端口时要注意的一点就是，大多数平台都区分8位、16位和32位的端口。  
-inb() outb() inw() outw() inl() outl()  
+
+&emsp;&emsp;inb() outb() inw() outw() inl() outl()  
 
 &emsp;&emsp;inb()的原型为:
 ```c
@@ -163,10 +159,10 @@ struct resource *requset_mem_region(unsigned long start, unsigned long len,char 
 &emsp;&emsp;在将I/O内存的物理地址映射成内核虚地址后，理论上讲我们就可以象读写内存那样直接读写I/O内存。但是，由于在某些平台上，对
 I/O内存和系统内存有不同的访问处理，因此为了确保跨平台的兼容性，Linux实现了一系列读写I/O内存的函数，这些函数在不同的平台上有不同的实现。但在x86平台上，读写I/O内存与读写内存无任何差别，相关函数如下：
 
-readb() readw() readl()  读I/O内存  
+readb() readw() readl()：读I/O内存  
 
-writeb() writew() writel()  写I/O内存  
+writeb() writew() writel()：写I/O内存  
 
-memset\_io() memcpy\_fromio() memcpytoio() 拷贝I/O内存   
+memset\_io() memcpy\_fromio() memcpytoio()：拷贝I/O内存   
 
 &emsp;&emsp;为了保证驱动程序的跨平台的可移植性，建议开发者应该使用上面的函数来访问I/O内存。
