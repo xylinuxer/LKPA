@@ -53,9 +53,7 @@ Block Driver）， Mysbd实现了一个使用系统内存的块设备，从本�
     if (Mysbd_major == 0) Mysbd_major = result; /* 动态分配主设备号 */
 ```
 
-&emsp;&emsp;然而，类似之处到此为止。我们已经看到了一个明显的不同：register\_chrdev()
-使用一个指向 file\_operations 结构的指针，而 register\_blkdev ( )则使用
-block\_device\_operations 结构的指针，该结构就是块驱动程序接口，其定义如下： 
+&emsp;&emsp;然而，类似之处到此为止。我们已经看到了一个明显的不同：register\_chrdev()使用一个指向 file\_operations 结构的指针，而 register\_blkdev ( )则使用block\_device\_operations 结构的指针，该结构就是块驱动程序接口，其定义如下： 
 ```c 
     struct block_device_operations {
     int (*open) (struct inode *, struct file *); /*打开块设备文件*/
@@ -65,9 +63,9 @@ block\_device\_operations 结构的指针，该结构就是块驱动程序接口
     int (*check_media_change) (kdev_t); /*检查介质是否已经变化（如软盘）*/int (*revalidate) (kdev_t); /*检查块设备是否持有有效数据*/
     };
 ```
-&emsp;&emsp;这里列出的 open、release 和 ioctl
-方法和字符设备的对应方法相同。其它两个方法是块设备所特有的。  
-Mysbd 使用的 bdops 接口定义如下：
+&emsp;&emsp;这里列出的 open、release 和 ioctl方法和字符设备的对应方法相同。其它两个方法是块设备所特有的。  
+
+&emsp;&emsp;Mysbd 使用的 bdops 接口定义如下：
 ```c
     struct block_device_operations Mysbd_bdops = {
             open: Mysbd_open,
@@ -78,18 +76,13 @@ Mysbd 使用的 bdops 接口定义如下：
     };
 ```
 
-&emsp;&emsp;请读者注意，block\_device\_operations 接口中没有read 或者write操作。所有涉及到块设备的 I/O 通常由系统进行缓冲处理，用户进程不会对这些设备执行直接的 I/O
-操作。在用户模式下对块设备的访问，通常隐含在对文件系统的操作当中，而这些操作能够从I/O 缓冲当中获得明显的好处。但是，对块设备的“直接”I/O访问，比如在创建文件系统时的 I/O 操作，也一样要通过 Linux
-的缓冲区缓存。为此，内核为块设备提供了一组单独的读写函数generic\_file\_read( )和generic\_file\_write ( )，驱动程序不必理会这些函数。  
+&emsp;&emsp;请读者注意，block\_device\_operations 接口中没有read 或者write操作。所有涉及到块设备的 I/O 通常由系统进行缓冲处理，用户进程不会对这些设备执行直接的 I/O操作。在用户模式下对块设备的访问，通常隐含在对文件系统的操作当中，而这些操作能够从I/O 缓冲当中获得明显的好处。但是，对块设备的“直接”I/O访问，比如在创建文件系统时的 I/O 操作，也一样要通过 Linux 的缓冲区缓存。为此，内核为块设备提供了一组单独的读写函数generic\_file\_read( )和generic\_file\_write ( )，驱动程序不必理会这些函数。  
 
 &emsp;&emsp;显然，块驱动程序最终必须提供完成实际块 I/O 操作的机制。在 Linux
 当中，用于这些 I/O 操作的方法称为“request（请求）”。request
 方法同时处理读取和写入操作，因此要复杂一些。我们稍后将讲述 request。  
 
-&emsp;&emsp;但在块设备的注册过程中，我们必须告诉内核实际的 request
-方法。然而，该方法并不在 block\_device\_operations
-结构中指定（这出于历史和性能两方面的考虑），相反，该方法和用于该设备的挂起I/O
-操作队列关联在一起。默认情况下，对每个主设备号并没有这样一个对应的队列。块驱动程序必须通过blk\_init\_queue 初始化这一队列。队列的初始化和清除接口定义如下：
+&emsp;&emsp;但在块设备的注册过程中，我们必须告诉内核实际的 request方法。然而，该方法并不在 block\_device\_operations结构中指定（这出于历史和性能两方面的考虑），相反，该方法和用于该设备的挂起I/O操作队列关联在一起。默认情况下，对每个主设备号并没有这样一个对应的队列。块驱动程序必须通过blk\_init\_queue 初始化这一队列。队列的初始化和清除接口定义如下：
 
 ```c  
     #include <Linux/blkdev.h>
@@ -97,15 +90,11 @@ Mysbd 使用的 bdops 接口定义如下：
     blk_cleanup_queue(request_queue_t *queue);
 ```
 
-&emsp;&emsp;blk\_init\_queue()函数建立请求队列，并将该驱动程序的 request
-函数（通过第二个参数传递）关联到队列。在模块的清除阶段，调用
-blk\_cleanup\_queue() 函数。Mysbd 驱动程序使用下面的代码行初始化它的队列：  
+&emsp;&emsp;blk\_init\_queue()函数建立请求队列，并将该驱动程序的 request函数（通过第二个参数传递）关联到队列。在模块的清除阶段，调blk\_cleanup\_queue() 函数。Mysbd 驱动程序使用下面的代码行初始化它的队列：  
+```c
 blk\_init\_queue(BLK\_DEFAULT\_QUEUE(major), Mysbd\_request);  
-
-&emsp;&emsp;每个设备有一个默认使用的请求队列，必要时，可使用 BLK\_DEFAULT\_QUEUE(major)
-宏得到该默认队列。这个宏在 blk\_dev\_struct 结构形成的全局数组（该数组名为
-blk\_dev）中搜索得到对应的默认队列。blk\_dev
-数组由内核维护，并可通过主设备号索引。blk\_dev\_struct 结构定义如下：
+```
+&emsp;&emsp;每个设备有一个默认使用的请求队列，必要时，可使用 BLK\_DEFAULT\_QUEUE(major)宏得到该默认队列。这个宏在 blk\_dev\_struct 结构形成的全局数组（该数组名为blk\_dev）中搜索得到对应的默认队列。blk\_dev数组由内核维护，并可通过主设备号索引。blk\_dev\_struct 结构定义如下：
 ```c
     struct blk_dev_struct {
             request_queue_t request_queue;
