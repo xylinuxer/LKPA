@@ -9,8 +9,8 @@
 &emsp;&emsp;open操作在内核中是由do\_sys\_open()函数完成的，其代码如下：
 ```c
     long do_sys_open(int dfd, const char __user *filename, int flags, umode_t mode)
-{
-	struct open_flags op;
+    {
+    	struct open_flags op;
 	int lookup = build_open_flags(flags, mode, &op);
 	struct filename *tmp = getname(filename);
 	int fd = PTR_ERR(tmp);
@@ -30,7 +30,7 @@
 		putname(tmp);
 	}
 	return fd;
-}
+    }
 ```
 &emsp;&emsp;其中，调用参数filename是文件的路径名（绝对路径名或相对路径名）；mode表示打开的模式，如“只读”等；而flag则包含许多标志位，用以表示打开模式以外的一些属性和要求。函数通过getname()从用户空间把文件的路径名拷贝到内核空间，并通过get\_unused\_fd\_flags(flags)从当前进程的“打开文件表”中找到一个空闲的表项，该表项的下标即为“文件描述符fd”。然后，通过do\_filp\_open()找到文件名对应索引节点的dentry结构以及ionde结构，并找到或创建一个由file数据结构代表的读／写文件的“上下文”。通过fd\_install()函数，将新建的file数据结构的指针“安装”到当前进程的file\_struct结构中，也就是已打开文件指针数组中，其位置即已分配的下标fd。
 
