@@ -153,7 +153,7 @@ blk\_init\_queue(BLK\_DEFAULT\_QUEUE(major), Mysbd\_request);
 
 &emsp;&emsp;下面给出一个并不进行实际数据传输的最小 request 函数，应该如下定义：
 ```c
-    void Mysbd _request(request_queue_t *q)
+    void Mysbd_request(request_queue_t *q)
     {
             while(1) {
                     INIT_REQUEST;
@@ -192,10 +192,8 @@ blk\_init\_queue(BLK\_DEFAULT\_QUEUE(major), Mysbd\_request);
             }
     }
 ```
-&emsp;&emsp;上面的代码和前面给出的空 request
-函数几乎没有什么不同，该函数本身集中于请求队列的管理上，而将实际的工作交给其它函数完成。第一个函数是
-Mysbd\_locate\_device()，它检索请求当中的设备编号，并找出正确的 Mysbd\_Dev
-结构；第二个函数是Mysbd\_transfer()，它完成实际的I/O请求：
+&emsp;&emsp;上面的代码和前面给出的空 request函数几乎没有什么不同，该函数本身集中于请求队列的管理上，而将实际的工作交给其它函数完成。第一个函数是
+Mysbd\_locate\_device()，它检索请求当中的设备编号，并找出正确的 Mysbd\_Dev结构；第二个函数是Mysbd\_transfer()，它完成实际的I/O请求：
 
 ```c
     static int Mysbd_transfer(Mysbd_Dev *device, const struct request *req)
