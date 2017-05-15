@@ -128,8 +128,7 @@ blk\_init\_queue(BLK\_DEFAULT\_QUEUE(major), Mysbd\_request);
 
 ### 9.5.2 块设备请求
 
-&emsp;&emsp;在内核安排一次数据传输时，它首先在一个表中对该请求排队，并以最大化系统性能为原则进行排序。然后，请求队列被传递到驱动程序的
-&emsp;&emsp;request 函数，该函数的原型如下： 
+&emsp;&emsp;在内核安排一次数据传输时，它首先在一个表中对该请求排队，并以最大化系统性能为原则进行排序。然后，请求队列被传递到驱动程序的request 函数，该函数的原型如下： 
 ```c 
     void request_fn (request_queue_t *queue);
 ```
