@@ -91,9 +91,9 @@ struct resource iomem_resource = {
   
 &emsp;&emsp;3.管理I/O端口资源
 
-　  
 &emsp;&emsp;采用I/O端口的X86处理器为外设实现了一个单独的地址空间，也即“I/O空间”或称为“I/O端口空间”，其大小是64KB(0x0000-0xffff)。Linux在其所支持的所有平台上都实现了“I/O端口空间”这一概念。  
-   
+
+
 &emsp;&emsp;由于I/O空间非常小，因此即使外设总线有一个单独的I/O端口空间，却也不是所有的外设都将其I/O端口(指寄存器)映射到“I/O端口空间”中。比如，大多数PCI卡都通过内存映射方式来将其I/O端口或外设内存映射到CPU的内存物理地址空间中。而老式的ISA卡通常将其I/O端口映射到I/O端口空间中。 
 
 &emsp;&emsp;Linux是基于“I/O区域”这一概念来实现对I/O端口资源的管理的。对I/O端口空间的操作基于I/O区域的操作函数\_\_xxx\_region()，Linux在头文件include/linux/ioport.h中定义了三个对I/O端口空间进行操作的接口函数：
@@ -129,6 +129,7 @@ struct resource iomem_resource = {
 
 &emsp;&emsp;port参数指定I/O端口空间中的端口地址。在大多数平台上(如x86)它都是unsigned short类型的，其它的一些平台上则是unsigned int类型的。显然，端口地址的类型是由I/O端口空间的大小来决定的。  
    
+   
 &emsp;&emsp;除了上述这些I/O操作外，某些CPU也支持对某个I/O端口进行连续的读写操作，也即对单个I/O端口读或写一系列字节、字或32位整数，这就是所谓的“串I/O指令”。这种指令在速度上显然要比用循环来实现同样的功能快得多。 
 ```
 insb() outsb() insw() outw() insl() outsl()  
