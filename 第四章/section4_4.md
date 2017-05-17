@@ -432,6 +432,7 @@ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
 ```
 
 &emsp;&emsp;分配页面快的步骤如下：
+
 (1) 从order开始的空闲块立案表上开始找空闲的块;
 
 (2) 若当前order上有空闲的页面块，则摘除空闲块并且跳转到步骤(4);
