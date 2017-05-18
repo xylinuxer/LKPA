@@ -8,14 +8,21 @@
 
 &emsp;&emsp;Linux的两种版本是相互关联的。实验版本最初是产品化版本的拷贝,然后产品化版本只修改错误，实验版本继续增加新功能，到实验版本测试证明稳定后拷贝成新的产品化版本，不断循环。如图1.4所示：
 
-![](http://i.imgur.com/CenH9Xo.png)
+<div align=center>
+<img src="1_4.png" />  
+</div>
+
 
 &emsp;&emsp;这样的组织方式一方面可以方便软件开发人员加入到Linux的开发和测试中来，另一方面又可以让一些用户使用稳定的Linux版本。目前，比较稳定的内核版本是2.6.x，最新版本为3.0.x。
 
 ### **1.4.3 Linux内核源代码的结构**
 
 &emsp;&emsp;Linux内核源代码位于`/usr/src/linux`目录下，其主要目录结构分布如图1.5所示，
-![](http://i.imgur.com/5Rfd2wS.png)
+
+<div align=center>
+<img src="1_5.png" />  
+</div>
+
 
      
 &emsp;&emsp;下面对每一个目录给予简单描述。

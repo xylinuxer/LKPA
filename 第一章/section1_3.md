@@ -26,7 +26,10 @@
 ### **1.3.2 Linux内核的位置**
 
 &emsp;&emsp;Linux内核不是孤立的，必须把它放在整个Linux系统中去研究，图1.2显示了Linux内核在整个系统中的位置：
-![](http://i.imgur.com/ABWq00T.png)
+
+<div align=center>
+<img src="1_2.png" />  
+</div>
 
 
 &emsp;&emsp;由图1.2可以看出，整个系统由四个部分组成：
@@ -39,7 +42,11 @@
 ### **1.3.3 Linux内核体系结构**
 
 &emsp;&emsp;虽然Linux内核和Unix系统在具体实现上有很大不同，但是其结构还基本保持一致，Linux内核除系统调调用外，由5个主要的子系统组成，如图1.3
-![](http://i.imgur.com/BZY6Wzx.png)  
+
+<div align=center>
+<img src="1_3.png" />  
+</div>
+
 
 1.	**进程调度(Process Scheduler，SCHED)**－控制着进程对CPU的访问。当需要选择一个进程运行时，由调度程序选择最值得运行的进程。
 2.	**内存管理(Memory Manager，MM)**－允许多个进程安全地共享主内存区域 。Linux的内存管理支持虚拟内存，即在计算机中运行的程序，其代码、数据和堆栈的总量可以超过实际内存的大小，操作系统只将当前使用的程序块保留在内存中，其余的程序块则保留在磁盘上。必要时，操作系统负责在磁盘和内存之间交换程序块。

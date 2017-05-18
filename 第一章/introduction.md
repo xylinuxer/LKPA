@@ -4,4 +4,8 @@
 
 &emsp;&emsp;操作系统作是一种庞大而复杂的系统软件，为了对这样一个庞然大物有全方位的认识，让我们站在这座大厦的不同侧面给予初步观察。
 
-![](http://i.imgur.com/MpCoHOE.png)
+
+<div align=center>
+<img src="1.png" />  
+</div>
+
