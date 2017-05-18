@@ -14,23 +14,37 @@
 
 &emsp;&emsp;如图2.5所示，虚拟地址空间中偏移量从0到limit范围内的一个段，映射到线性地址空间中就是从Base到Base+Limit。
 
-![](http://i.imgur.com/pQ8tic1.png)
+<div align=center>
+<img src="2_5.png" />  
+</div>
+
                   
 &emsp;&emsp;把图2.5用一个表描述则如图2.6:
-  ![](http://i.imgur.com/s23iRtc.png)
+
+<div align=center>
+<img src="2_6.png" />  
+</div>
+
 
 &emsp;&emsp;这样的表就是段描述符表（或叫段表），其中的表项叫做段描述符（Segment Descriptor）。
 
 &emsp;&emsp;所谓描述符(Descriptor)，就是描述段的属性的一个8字节存储单元。在实模式下，段的属性不外乎是代码段、堆栈段、数据段、段的起始地址、段的长度等等，而在保护模式下则复杂一些。将它们结合在一起用一个8字节的数表示，称为描述符 。80x86通用的段描述符的结构如图2.7所示。
 
-![](http://i.imgur.com/O4ZbGaB.png)
+<div align=center>
+<img src="2_7.png" />  
+</div>
+
 
 &emsp;&emsp;从图可以看出，一个段描述符指出了段的32位基地址和20位段界限(即段长)。
 
 &emsp;&emsp;第六个字节的G位是粒度位，当G=0时，以节长为单位表示段的长度，即一个段最长可达220（1M）字节。当G=1时，以页（4K）为单位表示段的长度，即一个段最长可达1M×4K=4G字节。D位表示缺省操作数的大小，如果D=0，操作数为16位，如果D=1，操作数为32位。第六个字节的其余两位为0，这是为了与将来的处理器兼容而必须设置为0的位。
 
 &emsp;&emsp;第5个字节是存取权字节，它的一般格式如图2.8所示：
-![](http://i.imgur.com/r55VWWk.png)
+
+<div align=center>
+<img src="2_8.png" />  
+</div>
+
 
 &emsp;&emsp;第7位P位(Present) 是存在位，表示这个段是否在内存中，如果在内存中。P=1；如果不在内存中，P=0。
 
@@ -45,7 +59,10 @@
 
 &emsp;&emsp;由此可以推断，在保护模式下段寄存器中该存放什么内容了，那就是图2.6中的索引。因为索引表示段描述符在描述符表中位置，因此，把段寄存器也叫选择符，其结构如图2.9所示：
 
-![](http://i.imgur.com/5pH4ARL.png)
+<div align=center>
+<img src="2_9.png" />  
+</div>
+
 
 
 &emsp;&emsp;可以看出，选择符有三个域。其中，第15～13位是索引域，第2位TI（Table Indicator）为选择域，决定从全局描述符表（TI=0）还是从局部描述符表（TI=1）中选择相应的段描述符。这里我们重点关注的是RPL域，RPL表示请求者的特权级（Requestor Privilege Level）。

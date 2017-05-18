@@ -12,7 +12,10 @@
 - 	页中间目录PMD（Page Middle Derectory）
 - 	页表PT（Page Table）
              
-![](http://i.imgur.com/ua66uMo.png)
+<div align=center>
+<img src="2_17.png" />  
+</div>
+
 
 &emsp;&emsp;尽管Linux采用的是三级分页模式，但我们的讨论还是以80X86的两级分页模式为主，因此，Linux忽略中间目录层，以后，我们把页总目录就叫页目录。
 
