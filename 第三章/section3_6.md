@@ -1,4 +1,4 @@
-## **3.6 与进程相关的系统调用及其应用**
+## **3．6 与进程相关的系统调用及其应用**
 
 &emsp;&emsp;以上介绍的是操作系统内核对进程所进行的管理。下面从编程者的角度来说明开发人员如何利用内核提供的系统调用进行程序的开发。这一方面有助于读者对操作系统内部的进一步了解，另一方面有助于读者在应用程序的开发中充分利用系统调用来提升程序的质量。
 
@@ -12,32 +12,31 @@
 
 &emsp;&emsp;我们回头看2.1.4节的进程举例。再次看到这个程序的时候，必须明确知道，在语句pid=fork()之前，只有一个进程在执行这段代码。当执行到fork()时，就陷入内核，具体说就是执行内核中的do_fork()函数。于是，在这条语句之后，就变成两个进程在执行了。
 
-&emsp;&emsp;fork可能有三种不同的返回值：
+fork可能有三种不同的返回值：
 
-&emsp;&emsp;（1）父进程中，fork返回新创建子进程的进程ID； 
+（1）	父进程中，fork返回新创建子进程的进程ID； 
 
-&emsp;&emsp;（2）子进程中，fork返回0； 
+（2）	子进程中，fork返回0； 
 
-&emsp;&emsp;（3）如果出现错误，fork返回一个负值； 
+（3）	如果出现错误，fork返回一个负值； 
 
 &emsp;&emsp;fork出错可能有两种原因：（1）当前的进程数已经达到了系统规定的上限，这时errno的值被设置为EAGAIN。（2）系统内存不足，这时errno的值被设置为ENOMEM。fork系统调用出错的可能性很小，而且如果出错，一般都为第一种错误。如果出现第二种错误，说明系统已经没有可分配的内存，正处于崩溃的边缘，这种情况对Linux来说是很罕见的。
 
 ### **3.6.2 exec系统调用**
 
 &emsp;&emsp;如果调用fork后，子进程和父进程几乎完全一样，而系统中产生新进程唯一的方法就是fork，那岂不是系统中所有的进程都要一模一样吗？那我们要执行新的应用程序时候怎么办？多数情况下，执行完fork后，子进程需要执行与父进程不同的代码。例如，对于一个shell，它首先从终端读取命令，然后创建一个子进程来执行该命令，shell进程等待子进程执行完毕，然后再读取下一条命令。为了等待子进程结束，父进程执行一条wait系统调用。该系统调用使父进程阻塞，直到它的任一个子进程结束。
-&emsp;&emsp;现在再来看shell如何使用fork。当键入一条命令时，shell首先创建一个子进程。用户的命令就是由该子进程执行，这是通过调用exec系统调用实现的。一个高度简化的shell框架如下：
+&emsp;现在再来看shell如何使用fork。当键入一条命令时，shell首先创建一个子进程。用户的命令就是由该子进程执行，这是通过调用exec系统调用实现的。一个高度简化的shell框架如下：
 
-	while(TURE) { 					/*TURE为1，无限循环*/
-		read_command(command, parameters);	/*从终端读取命令*/
-		if (fork()!=0) {			/*创建子进程*/
-			/* Parent code*/
-			wait(NULL);			/*等待子进程结束*/
-		} 
-		else {
-			/*Child code*/
-			exec(command, parameters,0);	/*执行命令*/
-		}  
-	}
+    while(TURE) 							/*TURE为1，无限循环*/
+     read_command(command, parameters);	/*从终端读取命令*/
+    if (fork()!=0){						/*创建子进程*/
+      /* Parent code*/
+      wait(NULL);					/*等待子进程结束*/
+    } else {
+     /*Child code*/
+    exec(command, parameters,0);	/*执行命令*/
+      }  
+    }
 
 &emsp;&emsp;wait系统调用等待子进程的结束。Exec有三个参数：待执行的文件名、指向参数数组的指针和指向环境变量的指针。系统提供了若干例程来简化这些参数的使用，包括execl, execv, execle和execve。本书采用exec来泛指所有这些系统调用。
 
@@ -58,41 +57,40 @@
 &emsp;&emsp;wait的函数原型为：pid_t wait(int *status)
 
 &emsp;&emsp;其中参数status用来保存被收集进程退出时的一些状态，它是一个指向int类型的指针。但如果我们对这个子进程是如何死掉的毫不在意，只想把这个僵尸进程消灭掉，（事实上绝大多数情况下，我们都会这样想），我们就可以设定这个参数为NULL，就像下面这样：
-	
-	pid = wait(NULL);
+    pid = wait(NULL);
 
 &emsp;&emsp;如果成功，wait会返回被收集的子进程的进程ID，如果调用进程没有子进程，调用就会失败，此时wait返回-1，同时errno被置为ECHILD。
 
 &emsp;&emsp;下面就让我们用一个例子来实战应用一下wait调用:
 
-	 /* wait1.c*/
-	 #include <sys/types.h>
-	 #include <sys/wait.h>
-	 #include <unistd.h>
-	 #include <stdlib.h>
+    ／* wait1.c*/
+    #include <sys/types.h>
+    #include <sys/wait.h>
+    #include <unistd.h>
+    #include <stdlib.h>
+    main()
+    {
+	    pid_t pc, pr;
+	    pc=fork();
+	    if(pc<0) 		/* 如果出错 */
+		    printf("error ocurred!\n");
+	    else if(pc==0){		/* 如果是子进程 */ 
+		    printf("This is child process with pid of %d\n",getpid());
+		    sleep(10);	/* 睡眠10秒钟 */
+	    }
+	    else{			/* 如果是父进程 */
+		    pr=wait(NULL);	/* 在这里等待 */
+		    printf("I catched a child process with pid of %d\n",pr);
+	    }		
+	    exit(0);
+    }
 
-	 main()
-	 {
-	     pid_t pc, pr;
-	     pc=fork();
-	     if(pc<0)                /* 如果出错 */
-	         printf("error ocurred!\n");
-	     else if(pc==0) {        /* 如果是子进程 */
-	         printf("This is child process with pid of %d\n",getpid());
-	         sleep(10);          /* 睡眠10秒钟 */                                        }
-	     else {                  /* 如果是父进程 */
-	         pr=wait(NULL);  /* 在这里等待 */
-	         printf("I catched a child process with pid of %d\n",pr);
-	     }
-	     exit(0);
-	 }
-	 
 &emsp;&emsp;编译并运行该程序：
 
-	$ gcc wait1.c -o wait1
-	$ ./wait1
-	This is child process with pid of 1508
-	I catched a child process with pid of 1508
+     $ cc wait1.c -o wait1
+     $ ./wait1
+    This is child process with pid of 1508
+    I catched a child process with pid of 1508
 
 &emsp;&emsp;运行时可以明显注意到，在第2行结果打印出来前有10秒钟的等待时间，这就是我们设定的让子进程睡眠的时间，只有子进程从睡眠中苏醒过来，它才能正常退出，也就才能被父进程捕捉到。其实这里我们不管设定子进程睡眠的时间有多长，父进程都会一直等待下去，读者如果有兴趣的话，可以试着自己修改一下这个数值，看看会出现怎样的结果。
 
@@ -104,9 +102,9 @@
 
 &emsp;&emsp;如果参数status的值不是NULL，wait就会把子进程退出时的状态取出并存入其中，这是一个整数值（int），指出了子进程是正常退出还是被非正常结束的（一个进程也可以被其他进程用信号结束），以及正常结束时的返回值，或被哪一个信号结束的等信息。由于这些信息被存放在一个整数的不同二进制位中，所以用常规的方法读取会非常麻烦，人们就设计了一套专门的宏（macro）来完成这项工作，下面我们来说明其中最常用的两个：
 
-&emsp;&emsp;（1）WIFEXITED(status) ：这个宏用来指出子进程是否为正常退出的，如果是，它会返回一个非零值。（注意，这里的status为整数，而wait的参数为指向整数的指针）
+（1）	WIFEXITED(status) ：这个宏用来指出子进程是否为正常退出的，如果是，它会返回一个非零值。（注意，这里的status为整数，而wait的参数为指向整数的指针）
 
-&emsp;&emsp;（2）WEXITSTATUS(status)： 当WIFEXITED返回非零值时，这个宏用来就提取子进程的返回值。
+（2）	WEXITSTATUS(status)： 当WIFEXITED返回非零值时，这个宏用来就提取子进程的返回值。
 
 ### **3.6.4 exit系统调用**
 
@@ -122,23 +120,21 @@
 
 &emsp;&emsp;当一个进程调用exit已退出，但其父进程还没有调用系统调用wait对其进行收集之前的这段时间里，它会一直保持僵尸状态，利用这个特点，我们给出一个简单的小程序：
 
-	 #include <sys/types.h>
-	 #include <unistd.h>
- 
-	 main()
-	 {
-	     pid_t pid;
- 	     pid=fork();
-	     if(pid<0)
-	         printf("error occurred!\n");
-	     else if(pid==0)
-	         exit(0);
-	     else
-	     {
-	         sleep(60);  /* 睡眠60秒，这段时间里，父进程什么也干不了 */
-	         wait(NULL); /* 收集僵尸进程的信息 */
-	     }
-	 }    
+    #include <sys/types.h>
+    #include <unistd.h>
+    main()
+    {
+	    pid_t pid;
+	    pid=fork();
+	    if(pid<0)	
+		    printf("error occurred!\n");
+	    else if(pid==0)  
+		    exit(0);
+    else		
+		    { sleep(60);	/* 睡眠60秒，这段时间里，父进程什么也干不了 */
+		    wait(NULL);	/* 收集僵尸进程的信息 */
+                }  
+    }
 
 &emsp;&emsp;sleep的作用是让进程睡眠指定的秒数，在这60秒内，子进程已经退出，而父进程正忙着睡觉，不可能对它进行收集，这样，我们就能保持子进程60秒的僵尸状态。
 
