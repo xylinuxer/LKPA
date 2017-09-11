@@ -119,9 +119,9 @@ point)”，如图8.2。由于Ext4是Linux的标准文件系统，所以系统�
 
 &emsp;&emsp;例如：
 ```
-    $ mount -t iso9660 /dev/cdrom /mnt/cdrom
+    $ mount -t ntfs /dev/sdd /mnt/usb
 ```
-&emsp;&emsp;其中，iso9660是光驱文件系统的名称，/dev/cdrom是包含文件系统的物理块设备，/mnt/cdrom就是将要安装到的目录，即安装点。从这个例子可以看出，安装一个文件系统实际上是安装一个物理设备。
+&emsp;&emsp;其中，ntfs是u盘的文件系统名称，/dev/sdd是包含文件系统的物理块设备，/mnt/usb就是将要安装到的目录，即安装点。从这个例子可以看出，安装一个文件系统实际上是安装一个物理设备。
 
 4.文件系统创建示例
 
