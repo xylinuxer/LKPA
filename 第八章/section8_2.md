@@ -4,7 +4,7 @@
 
 ### 8.2.1虚拟文件系统的引入
 
-&emsp;&emsp;Linux最初采用的是Minix的文件系统，但是，Minix是一种教学用操作系统，其文件系统的大小限于64MB，文件名长度也限于14个字节。所以，Linux经过一段时间的改进和发展，特别是吸取了Unix文件系统多年改进所积累的经验，最后形成了Ext4文件系统。可以说，Ext4文件系统就是Linux文件系统。
+&emsp;&emsp;Linux最初采用的是Minix的文件系统，但是，Minix是一种教学用操作系统，其文件系统的大小限于64MB，文件名长度也限于14个字节。所以，Linux经过一段时间的改进和发展，特别是吸取了Unix文件系统多年改进所积累的经验，最终形成了现在的Ext4文件系统。
 
 &emsp;&emsp;虚拟文件系统所提供的抽象界面主要由一组标准的、抽象的操作构成，例如read()、write()、lseek等，这些函数以系统调用的形式供用户程序调用。这样，用户程序调用这些系统调用时，根本无需关心所操作的文件属于哪个文件系统，这个文件系统是怎样设计和实现的。
 
@@ -81,6 +81,10 @@ Ext4写函数（而不是DOS文件系统的写函数）执行。
  
  
 &emsp;&emsp;既然，VFS承担管家的角色，那么我们分析一下它到底要管哪些对象。Linux在文件系统的设计中，全然汲取了Unix的设计思想。Unix在文件系统的设计中抽象出四个概念：文件，目录项，索引节点和超级块。
+
+<div align=center>
+<img src="图8_13.PNG" />  
+</div>
 
 &emsp;&emsp;从本质上讲文件系统是特殊的数据分层存储结构，它包含文件、目录和相关的控制信息。文件系统的典型操作包含创建、删除和安装等等。如前所述，一个文件系统被挂载在根文件系统的某个枝叶上，这就是**安装点**，安装点在全局的层次结构中具有独立的命名空间。
 
@@ -505,10 +509,10 @@ struct files_struct {
 ```
 &emsp;&emsp;可以看出，其中包含有各种函数、变量的地址。我们知道，一旦知道一个变量的地址，通过指针取出其内容就是轻而易举的事。
 ```
-    $cat /proc/kallsyms | grep super_blocks  c03f83ac D super_blocks 
-    /* super_blocks 变量的地址为c03f83ac */  
+    $cat /proc/kallsyms | grep super_blocks  
+    c03f83ac D super_blocks   /* super_blocks 变量的地址为c03f83ac */  
     $ cat /proc/kallsyms | grep sb_lock  
-    c03f83b4 D sb_lock /* sb_lock 变量的地址为c03f83b4*/  
+    c03f83b4 D sb_lock   /* sb_lock 变量的地址为c03f83b4*/  
     （注，从你的机子上取出来的值可能与此有所不同）
 ```
 &emsp;&emsp;于是，定义如下宏：  
